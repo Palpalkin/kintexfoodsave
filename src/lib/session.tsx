@@ -6,6 +6,8 @@ import type { Space } from './types'
 
 type Ctx = {
   session: Session | null
+  recovery: boolean
+  clearRecovery: () => void
   ready: boolean
   spaces: Space[]
   space: Space | null
@@ -18,12 +20,13 @@ export const useApp = () => useContext(C)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
+  const [recovery, setRecovery] = useState(false)
   const [spaces, setSpaces] = useState<Space[]>(cacheGet<Space[]>('spaces') ?? [])
   const [spaceId, setSpaceIdState] = useState<string | null>(localStorage.getItem('fs.space'))
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true) })
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    const { data } = supabase.auth.onAuthStateChange((e, s) => { setSession(s); if (e === 'PASSWORD_RECOVERY') setRecovery(true) })
     return () => data.subscription.unsubscribe()
   }, [])
 
@@ -43,5 +46,5 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const space = spaces.find((s) => s.id === spaceId) ?? spaces[0] ?? null
   const setSpaceId = (id: string) => { localStorage.setItem('fs.space', id); setSpaceIdState(id) }
 
-  return <C.Provider value={{ session, ready, spaces, space, setSpaceId, reloadSpaces }}>{children}</C.Provider>
+  return <C.Provider value={{ session, recovery, clearRecovery: () => setRecovery(false), ready, spaces, space, setSpaceId, reloadSpaces }}>{children}</C.Provider>
 }

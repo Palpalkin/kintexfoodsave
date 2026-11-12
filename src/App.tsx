@@ -5,7 +5,7 @@ import { configured, supabase } from '@/lib/supabase'
 import { AppProvider, useApp } from '@/lib/session'
 import { flush } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
-import Auth from '@/pages/Auth'
+import Auth, { NewPassword } from '@/pages/Auth'
 import Products from '@/pages/Products'
 import Recipes from '@/pages/Recipes'
 import Family from '@/pages/Family'
@@ -34,13 +34,14 @@ async function notifyExpiring(spaceId: string) {
 }
 
 function Shell() {
-  const { session, ready, space } = useApp()
+  const { session, ready, space, recovery, clearRecovery } = useApp()
   useEffect(() => { if (space) void notifyExpiring(space.id) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void flush() }, [session])
 
   if (!configured) return <div className="p-6 text-sm">Не настроены переменные окружения <code>VITE_SUPABASE_URL</code> и <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>. См. README.</div>
   if (!ready) return null
   if (!session) return <Auth />
+  if (recovery) return <NewPassword onDone={clearRecovery} />
 
   return (
     <div className="mx-auto flex min-h-full max-w-xl flex-col">
