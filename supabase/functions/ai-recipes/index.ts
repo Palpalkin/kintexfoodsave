@@ -43,7 +43,6 @@ Deno.serve(async (req) => {
 
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-    db: { schema: 'foodsave' },
   })
   const { data: user } = await sb.auth.getUser()
   if (!user.user) return json({ error: 'Требуется вход' }, 401)

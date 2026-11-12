@@ -13,9 +13,7 @@
 - Напоминания о сроках: проверка при открытии приложения (без фоновых процессов и опроса БД).
 
 ## Данные в Supabase
-Всё лежит в отдельной схеме `foodsave` (проект `Kintexvision`), таблицы других приложений не затронуты. Миграция: `supabase/migrations/`.
-
-**Обязательно один раз:** Supabase Dashboard → Project Settings → API → *Exposed schemas* → добавить `foodsave` (иначе клиент получит 406/«schema not found»).
+Проект Supabase `KINTEXFOODSAVE` (отдельный, Free). Таблицы в схеме `public`, вспомогательные функции RLS — в закрытой схеме `foodsave_private`. Миграция: `supabase/migrations/`.
 
 ## Переменные окружения
 См. `.env.example`. Во frontend — только `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY`. `service_role` и ключи AI во frontend/GitHub не попадают.
