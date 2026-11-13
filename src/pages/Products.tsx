@@ -121,7 +121,7 @@ export default function Products() {
 
       {!items.length && !loading && (
         <div className="flex flex-col items-center gap-3 py-8 text-center">
-          <img src="/logo-mascot.webp" alt="" className="h-40 w-auto" />
+          <img src="/logo-pair.webp" alt="" className="h-36 w-auto" />
           <p className="text-sm text-green-900/60">Пока пусто. Добавьте продукт или отсканируйте чек.</p>
         </div>
       )}

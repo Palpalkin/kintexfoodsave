@@ -11,7 +11,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['apple-touch-icon.png', 'favicon.png', 'logo-hero.webp', 'logo-mascot.webp'],
+      includeAssets: ['apple-touch-icon.png', 'favicon.png', 'logo-hero.webp', 'logo-pair.webp'],
       manifest: {
         name: 'KINTEXFOODSAVE',
         short_name: 'FoodSave',
