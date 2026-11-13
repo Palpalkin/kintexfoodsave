@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Camera, Check, Pencil, Plus, ScanLine, Search, Trash2, X } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Barcode, Camera, Check, Pencil, Plus, ScanLine, Search, Trash2, X } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
@@ -8,6 +8,9 @@ import { compressImage } from '@/lib/image'
 import { enqueue, flush, isOffline } from '@/lib/outbox'
 import { cn, daysLeft } from '@/lib/utils'
 import { ExpiryField } from '@/components/ExpiryField'
+import { BarcodeScanner } from '@/components/BarcodeScanner'
+import { lookupBarcode } from '@/lib/barcode'
+import { addToShopping, autoShopEnabled } from '@/lib/shopping'
 import { emptyExpiry, expiryFields, fmt, type ExpiryState } from '@/lib/expiry'
 import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -39,6 +42,14 @@ export default function Products() {
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
   const [exp, setExp] = useState(emptyExpiry())
+  const [nm, setNm] = useState('')
+  const [bc, setBc] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [bcMsg, setBcMsg] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null)
+  const [fromShop, setFromShop] = useState<string | null>(null)
+  const loc = useLocation()
+  const nav = useNavigate()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [editing, setEditing] = useState<Product | null>(null)
@@ -73,10 +84,28 @@ export default function Products() {
     return () => window.removeEventListener('online', on)
   })
 
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t) }, [toast])
+
+  // Переход из списка покупок: «Купил → в продукты» открывает форму с названием, остаётся указать срок
+  useEffect(() => {
+    const pre = (loc.state as { prefill?: { name: string; shoppingId: string } } | null)?.prefill
+    if (!pre) return
+    setAdding(true); setNm(pre.name); setFromShop(pre.shoppingId)
+    nav('.', { replace: true, state: null })
+  }, [loc.state, nav])
+
   async function setStatus(p: Product, status: 'consumed' | 'discarded') {
     setItems((l) => l.filter((x) => x.id !== p.id))
     if (isOffline()) enqueue({ t: 'update', table: 'products', id: p.id, patch: { status } })
     else await supabase.from('products').update({ status }).eq('id', p.id)
+    if (!space || !session) return
+    const shop = () => addToShopping(space.id, session.user.id, { name: p.name, unit: p.unit })
+    if (status === 'consumed' && autoShopEnabled()) {
+      const r = await shop()
+      setToast({ text: r === 'added' ? `«${p.name}» добавлено в список покупок` : `«${p.name}» уже в списке покупок` })
+    } else if (status === 'discarded') {
+      setToast({ text: `«${p.name}» выброшено`, action: { label: 'В покупки', run: () => { void shop(); setToast(null) } } })
+    }
   }
 
   async function add(e: FormEvent<HTMLFormElement>) {
@@ -90,6 +119,7 @@ export default function Products() {
       name: String(f.get('name')).trim(),
       quantity: Number(f.get('quantity') || 1), unit: String(f.get('unit') || 'шт'),
       location: String(f.get('location') || '') || null,
+      barcode: bc,
       ...expiryFields(exp),
     }
     if (file?.size && !isOffline()) {
@@ -100,7 +130,19 @@ export default function Products() {
     }
     if (isOffline()) { enqueue({ t: 'insert', table: 'products', row }); setItems((l) => [row as unknown as Product, ...l]) }
     else { await supabase.from('products').insert(row); await load(0) }
-    setAdding(false); setExp(emptyExpiry())
+    if (fromShop) {
+      if (isOffline()) enqueue({ t: 'delete', table: 'shopping_items', id: fromShop })
+      else await supabase.from('shopping_items').delete().eq('id', fromShop)
+      setFromShop(null)
+    }
+    setAdding(false); setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null)
+  }
+
+  async function onBarcode(code: string) {
+    setScanning(false); setBc(code); setBcMsg('Ищу название…')
+    const found = space ? await lookupBarcode(code, space.id) : null
+    if (found) { setNm(found.name); setBcMsg(found.source === 'history' ? 'Название из ваших прошлых продуктов' : 'Название найдено в базе Open Food Facts, проверьте его') }
+    else setBcMsg('Название не найдено: введите его, я запомню его для этого штрихкода')
   }
 
   function startEdit(p: Product) { setEditing(p); setEditExp(toExpiryState(p)) }
@@ -157,7 +199,14 @@ export default function Products() {
       {adding && (
         <Card>
           <form onSubmit={add} className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><Label>Название</Label><Input name="name" required maxLength={120} autoFocus /></div>
+            <div className="col-span-2">
+              <Label>Название</Label>
+              <div className="flex gap-2">
+                <Input name="name" required maxLength={120} autoFocus value={nm} onChange={(e) => setNm(e.target.value)} />
+                <Button type="button" variant="outline" size="icon" title="Сканировать штрихкод" onClick={() => setScanning(true)}><Barcode size={18} /></Button>
+              </div>
+              {bc && <p className="mt-1 text-xs text-green-900/70">Штрихкод {bc}{bcMsg ? ` · ${bcMsg}` : ''} <button type="button" className="underline" onClick={() => { setBc(null); setBcMsg(null) }}>убрать</button></p>}
+            </div>
             <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
             <div><Label>Единица</Label><Input name="unit" defaultValue="шт" /></div>
             <div className="col-span-2"><Label>Место</Label><Input name="location" placeholder="холодильник" /></div>
@@ -170,6 +219,8 @@ export default function Products() {
           </form>
         </Card>
       )}
+
+      {scanning && <BarcodeScanner onDetect={onBarcode} onClose={() => setScanning(false)} />}
 
       {items.length > 0 && (
         <>
@@ -206,23 +257,32 @@ export default function Products() {
           </form>
         </Card>
       ) : (
-        <Card key={p.id} className="flex items-center gap-2 p-3">
+        <Card key={p.id} className="flex items-start gap-3 p-3">
           {p.photo_path && thumbs[p.photo_path]
             ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
             : <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-soft" />}
           <div className="min-w-0 flex-1">
-            <div className="truncate font-medium">{p.name}</div>
-            <div className="flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">
+            <div className="break-words font-medium leading-snug">{p.name}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">
               <span>{p.quantity} {p.unit}</span>{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
             </div>
+            <div className="mt-1.5"><ExpiryBadge date={p.expires_on} /></div>
           </div>
-          <ExpiryBadge date={p.expires_on} />
-          <Button variant="ghost" size="icon" title="Изменить" onClick={() => startEdit(p)}><Pencil size={16} className="text-green-900/60" /></Button>
-          <Button variant="ghost" size="icon" title="Использовано" onClick={() => setStatus(p, 'consumed')}><Check size={18} className="text-brand" /></Button>
-          <Button variant="ghost" size="icon" title="Выброшено" onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className="text-red-600" /></Button>
+          <div className="-mr-1 flex shrink-0">
+            <Button variant="ghost" size="icon" title="Изменить" onClick={() => startEdit(p)}><Pencil size={16} className="text-green-900/60" /></Button>
+            <Button variant="ghost" size="icon" title="Использовано" onClick={() => setStatus(p, 'consumed')}><Check size={18} className="text-brand" /></Button>
+            <Button variant="ghost" size="icon" title="Выброшено" onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className="text-red-600" /></Button>
+          </div>
         </Card>
       ))}
       {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>Показать ещё</Button>}
+
+      {toast && (
+        <div className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-green-950 px-4 py-3 text-sm text-white shadow-lg">
+          <span>{toast.text}</span>
+          {toast.action && <button className="shrink-0 font-semibold text-green-300 underline" onClick={toast.action.run}>{toast.action.label}</button>}
+        </div>
+      )}
     </div>
   )
 }

@@ -10,3 +10,5 @@ export type Recipe = {
   id: string; space_id: string; title: string
   ingredients: Ingredient[]; instructions: string; source: 'manual' | 'ai'
 }
+
+export type ShoppingItem = { id: string; space_id: string; name: string; quantity: number; unit: string; checked: boolean }

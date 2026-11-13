@@ -1,19 +1,22 @@
 import { useEffect } from 'react'
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { Apple, ChefHat, Settings as Cog, Users } from 'lucide-react'
+import { Apple, ChefHat, Settings as Cog, ShoppingCart, Users } from 'lucide-react'
 import { configured, supabase } from '@/lib/supabase'
 import { AppProvider, useApp } from '@/lib/session'
 import { flush } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
+import { currentSubscription } from '@/lib/push'
 import Auth, { NewPassword } from '@/pages/Auth'
 import Products from '@/pages/Products'
 import Recipes from '@/pages/Recipes'
+import Shopping from '@/pages/Shopping'
 import Family from '@/pages/Family'
 import Settings from '@/pages/Settings'
 import Scan from '@/pages/Scan'
 
 const tabs = [
   { to: '/', label: 'Продукты', icon: Apple },
+  { to: '/shopping', label: 'Покупки', icon: ShoppingCart },
   { to: '/recipes', label: 'Рецепты', icon: ChefHat },
   { to: '/family', label: 'Семья', icon: Users },
   { to: '/settings', label: 'Настройки', icon: Cog },
@@ -24,6 +27,7 @@ async function notifyExpiring(spaceId: string) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted' || !navigator.onLine) return
   const today = new Date().toDateString()
   if (localStorage.getItem('fs.notified') === today) return
+  if (await currentSubscription().catch(() => null)) return // фоновые push уже включены: не дублируем
   const limit = Number(localStorage.getItem('fs.notifyDays') ?? 3)
   const { data } = await supabase.from('products').select('name,expires_on').eq('space_id', spaceId).eq('status', 'active').not('expires_on', 'is', null).limit(100)
   const soon = (data ?? []).filter((p) => { const d = daysLeft(p.expires_on); return d !== null && d <= limit })
@@ -50,6 +54,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Products />} />
           <Route path="/scan" element={<Scan />} />
+          <Route path="/shopping" element={<Shopping />} />
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/family" element={<Family />} />
           <Route path="/settings" element={<Settings />} />

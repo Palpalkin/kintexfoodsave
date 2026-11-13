@@ -30,6 +30,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        importScripts: ['/push-sw.js'],
         globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
         globIgnores: ['tesseract/**'], // тяжёлый OCR-движок кэшируется при первом использовании (runtimeCaching ниже)
         runtimeCaching: [

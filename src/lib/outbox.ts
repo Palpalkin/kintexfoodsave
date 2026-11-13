@@ -2,9 +2,11 @@
 // и отправляются при восстановлении соединения.
 import { supabase } from './supabase'
 
+type Table = 'products' | 'shopping_items'
 type Op =
-  | { t: 'insert'; table: 'products'; row: Record<string, unknown> }
-  | { t: 'update'; table: 'products'; id: string; patch: Record<string, unknown> }
+  | { t: 'insert'; table: Table; row: Record<string, unknown> }
+  | { t: 'update'; table: Table; id: string; patch: Record<string, unknown> }
+  | { t: 'delete'; table: Table; id: string }
 
 const KEY = 'fs.outbox.v1'
 const read = (): Op[] => { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') } catch { return [] } }
@@ -20,7 +22,9 @@ export async function flush(): Promise<number> {
   for (const op of q) {
     const res = op.t === 'insert'
       ? await supabase.from(op.table).insert(op.row)
-      : await supabase.from(op.table).update(op.patch).eq('id', op.id)
+      : op.t === 'update'
+        ? await supabase.from(op.table).update(op.patch).eq('id', op.id)
+        : await supabase.from(op.table).delete().eq('id', op.id)
     if (res.error && res.error.code !== '23505') rest.push(op); else done++
   }
   write(rest)
