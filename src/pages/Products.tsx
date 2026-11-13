@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Camera, Check, Plus, Trash2, X } from 'lucide-react'
+import { Camera, Check, Plus, ScanLine, Trash2, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
@@ -95,7 +96,10 @@ export default function Products() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Продукты</h2>
+        <div className="flex gap-2">
+        <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />Чек</Link></Button>
         <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Добавить'}</Button>
+        </div>
       </div>
 
       {adding && (
@@ -115,7 +119,12 @@ export default function Products() {
         </Card>
       )}
 
-      {!items.length && !loading && <p className="py-10 text-center text-sm text-green-900/60">Пока пусто. Добавьте первый продукт.</p>}
+      {!items.length && !loading && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <img src="/logo-mascot.webp" alt="" className="h-40 w-auto" />
+          <p className="text-sm text-green-900/60">Пока пусто. Добавьте продукт или отсканируйте чек.</p>
+        </div>
+      )}
 
       {items.map((p) => (
         <Card key={p.id} className="flex items-center gap-3 p-3">

@@ -11,7 +11,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['apple-touch-icon.png', 'favicon.svg'],
+      includeAssets: ['apple-touch-icon.png', 'favicon.png', 'logo-hero.webp', 'logo-mascot.webp'],
       manifest: {
         name: 'KINTEXFOODSAVE',
         short_name: 'FoodSave',
@@ -20,18 +20,24 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        background_color: '#f6faf5',
+        background_color: '#fdfdfc',
         theme_color: '#15803d',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
         navigateFallback: '/index.html',
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
+        globIgnores: ['tesseract/**'], // тяжёлый OCR-движок кэшируется при первом использовании (runtimeCaching ниже)
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/tesseract/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'fs-ocr', cacheableResponse: { statuses: [0, 200] }, expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+          },
           {
             urlPattern: ({ url }) => url.pathname.includes('/storage/v1/object/sign/'),
             handler: 'CacheFirst',

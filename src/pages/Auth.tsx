@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react'
-import { Leaf } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
@@ -53,9 +52,8 @@ export default function Auth() {
   return (
     <div className="mx-auto flex min-h-full max-w-sm flex-col justify-center gap-6 p-4">
       <div className="text-center">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white"><Leaf /></div>
-        <h1 className="text-2xl font-bold">KINTEXFOODSAVE</h1>
-        <p className="text-sm text-green-900/70">Продукты, сроки годности и питание</p>
+        <img src="/logo-hero.webp" alt="KINTEX FOOD SAVE" className="mx-auto h-auto w-full max-w-[320px]" />
+        <p className="mt-2 text-sm text-green-900/70">Умная система управления продуктами, сроками годности и питанием</p>
       </div>
       <Card>
         <form onSubmit={submit} className="space-y-3">

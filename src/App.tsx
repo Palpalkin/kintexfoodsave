@@ -10,6 +10,7 @@ import Products from '@/pages/Products'
 import Recipes from '@/pages/Recipes'
 import Family from '@/pages/Family'
 import Settings from '@/pages/Settings'
+import Scan from '@/pages/Scan'
 
 const tabs = [
   { to: '/', label: 'Продукты', icon: Apple },
@@ -48,6 +49,7 @@ function Shell() {
       <main className="flex-1 p-4 pb-24">
         <Routes>
           <Route path="/" element={<Products />} />
+          <Route path="/scan" element={<Scan />} />
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/family" element={<Family />} />
           <Route path="/settings" element={<Settings />} />
