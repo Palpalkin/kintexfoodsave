@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Camera, Check, Plus, ScanLine, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Camera, Check, Pencil, Plus, ScanLine, Search, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
@@ -8,7 +8,7 @@ import { compressImage } from '@/lib/image'
 import { enqueue, flush, isOffline } from '@/lib/outbox'
 import { cn, daysLeft } from '@/lib/utils'
 import { ExpiryField } from '@/components/ExpiryField'
-import { emptyExpiry, expiryFields, fmt } from '@/lib/expiry'
+import { emptyExpiry, expiryFields, fmt, type ExpiryState } from '@/lib/expiry'
 import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
@@ -16,6 +16,8 @@ import { Badge, Card } from '@/components/ui/card'
 
 const PAGE = 30
 const COLS = 'id,space_id,name,category,quantity,unit,location,expires_on,produced_on,notes,photo_path,status'
+
+type Filter = 'all' | 'soon' | 'expired'
 
 function ExpiryBadge({ date }: { date: string | null }) {
   const d = daysLeft(date)
@@ -27,6 +29,8 @@ function ExpiryBadge({ date }: { date: string | null }) {
   return <Badge className="bg-green-100 text-green-800">{d} дн.</Badge>
 }
 
+const toExpiryState = (p: Product): ExpiryState => ({ ...emptyExpiry(), mode: 'until', until: p.expires_on ?? '', produced: p.produced_on ?? '' })
+
 export default function Products() {
   const { space, session } = useApp()
   const [items, setItems] = useState<Product[]>([])
@@ -35,6 +39,10 @@ export default function Products() {
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
   const [exp, setExp] = useState(emptyExpiry())
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [editing, setEditing] = useState<Product | null>(null)
+  const [editExp, setEditExp] = useState(emptyExpiry())
 
   const load = useCallback(async (from: number) => {
     if (!space) return
@@ -95,13 +103,54 @@ export default function Products() {
     setAdding(false); setExp(emptyExpiry())
   }
 
+  function startEdit(p: Product) { setEditing(p); setEditExp(toExpiryState(p)) }
+
+  async function saveEdit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editing) return
+    const f = new FormData(e.currentTarget)
+    const patch = {
+      name: String(f.get('name')).trim() || editing.name,
+      quantity: Number(f.get('quantity') || 0), unit: String(f.get('unit') || 'шт'),
+      location: String(f.get('location') || '') || null,
+      ...expiryFields(editExp),
+    }
+    setItems((l) => l.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
+    if (isOffline()) enqueue({ t: 'update', table: 'products', id: editing.id, patch })
+    else await supabase.from('products').update(patch).eq('id', editing.id)
+    setEditing(null)
+  }
+
+  const stats = useMemo(() => {
+    let expired = 0, soon = 0
+    for (const p of items) { const d = daysLeft(p.expires_on); if (d === null) continue; if (d < 0) expired++; else if (d <= 3) soon++ }
+    return { expired, soon }
+  }, [items])
+
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    return items.filter((p) => {
+      if (needle && !(p.name + ' ' + (p.location ?? '')).toLowerCase().includes(needle)) return false
+      const d = daysLeft(p.expires_on)
+      if (filter === 'expired') return d !== null && d < 0
+      if (filter === 'soon') return d !== null && d >= 0 && d <= 3
+      return true
+    })
+  }, [items, q, filter])
+
+  const chip = (f: Filter, label: string, n?: number, tone = '') => (
+    <button key={f} onClick={() => setFilter(f)} className={cn('h-8 rounded-full border px-3 text-xs font-medium', filter === f ? 'border-brand bg-brand text-white' : 'border-green-200 bg-white ' + tone)}>
+      {label}{n !== undefined && n > 0 ? ` · ${n}` : ''}
+    </button>
+  )
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Продукты</h2>
         <div className="flex gap-2">
-        <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />Чек</Link></Button>
-        <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Добавить'}</Button>
+          <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />Чек</Link></Button>
+          <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Добавить'}</Button>
         </div>
       </div>
 
@@ -122,27 +171,55 @@ export default function Products() {
         </Card>
       )}
 
+      {items.length > 0 && (
+        <>
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-green-900/40" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию или месту" className="pl-9" />
+          </div>
+          <div className="flex gap-2 overflow-x-auto">
+            {chip('all', 'Все')}
+            {chip('soon', 'Скоро (≤3 дн.)', stats.soon)}
+            {chip('expired', 'Просрочено', stats.expired, stats.expired ? 'text-red-700' : '')}
+          </div>
+        </>
+      )}
+
       {!items.length && !loading && (
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <img src="/logo-pair.webp" alt="" className="h-36 w-auto" />
           <p className="text-sm text-green-900/60">Пока пусто. Добавьте продукт или отсканируйте чек.</p>
         </div>
       )}
+      {items.length > 0 && !shown.length && <p className="py-6 text-center text-sm text-green-900/60">Ничего не найдено.</p>}
 
-      {items.map((p) => (
-        <Card key={p.id} className="flex items-center gap-3 p-3">
+      {shown.map((p) => editing?.id === p.id ? (
+        <Card key={p.id}>
+          <form onSubmit={saveEdit} className="grid grid-cols-2 gap-3">
+            <div className="col-span-2"><Label>Название</Label><Input name="name" required maxLength={120} defaultValue={p.name} /></div>
+            <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={p.quantity} /></div>
+            <div><Label>Единица</Label><Input name="unit" defaultValue={p.unit} /></div>
+            <div className="col-span-2"><Label>Место</Label><Input name="location" defaultValue={p.location ?? ''} placeholder="холодильник" /></div>
+            <div className="col-span-2"><ExpiryField value={editExp} onChange={setEditExp} /></div>
+            <Button type="button" variant="outline" onClick={() => setEditing(null)}>Отмена</Button>
+            <Button>Сохранить</Button>
+          </form>
+        </Card>
+      ) : (
+        <Card key={p.id} className="flex items-center gap-2 p-3">
           {p.photo_path && thumbs[p.photo_path]
-            ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 rounded-lg object-cover" />
-            : <div className="h-12 w-12 rounded-lg bg-brand-soft" />}
+            ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+            : <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-soft" />}
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium">{p.name}</div>
-            <div className="flex items-center gap-2 text-xs text-green-900/60">
+            <div className="flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">
               <span>{p.quantity} {p.unit}</span>{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
             </div>
           </div>
           <ExpiryBadge date={p.expires_on} />
+          <Button variant="ghost" size="icon" title="Изменить" onClick={() => startEdit(p)}><Pencil size={16} className="text-green-900/60" /></Button>
           <Button variant="ghost" size="icon" title="Использовано" onClick={() => setStatus(p, 'consumed')}><Check size={18} className="text-brand" /></Button>
-          <Button variant="ghost" size="icon" title="Выброшено" onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className={cn('text-red-600')} /></Button>
+          <Button variant="ghost" size="icon" title="Выброшено" onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className="text-red-600" /></Button>
         </Card>
       ))}
       {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>Показать ещё</Button>}
