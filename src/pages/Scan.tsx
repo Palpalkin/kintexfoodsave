@@ -5,15 +5,15 @@ import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { enqueue, isOffline } from '@/lib/outbox'
 import { recognizeReceipt } from '@/lib/ocr'
-import { guessExpiry, parseReceipt } from '@/lib/receipt'
+import { parseReceipt } from '@/lib/receipt'
+import { ExpiryField } from '@/components/ExpiryField'
+import { emptyExpiry, expiryFields, type ExpiryState } from '@/lib/expiry'
 import { readReceiptQr, type FiscalQr } from '@/lib/qr'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 
-type Row = { id: string; on: boolean; name: string; quantity: number; unit: string; expires_on: string; sum: number | null }
-
-const today = () => new Date().toISOString().slice(0, 10)
+type Row = { id: string; on: boolean; name: string; quantity: number; unit: string; exp: ExpiryState; sum: number | null }
 
 export default function Scan() {
   const { space, session } = useApp()
@@ -22,7 +22,6 @@ export default function Scan() {
   const [progress, setProgress] = useState({ p: 0, label: '' })
   const [rows, setRows] = useState<Row[] | null>(null)
   const [raw, setRaw] = useState('')
-  const [bought, setBought] = useState(today())
   const [err, setErr] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [qr, setQr] = useState<FiscalQr | null>(null)
@@ -35,8 +34,7 @@ export default function Scan() {
       // 1) QR чека: точная дата покупки и сумма (быстро, на устройстве)
       setProgress({ p: 0.03, label: 'Ищу QR-код…' })
       const code = await readReceiptQr(file).catch(() => null)
-      const date = code?.date ?? bought
-      if (code) { setQr(code); if (code.date) setBought(code.date) }
+      if (code) setQr(code)
 
       // 2) Позиции по QR через сервис (работает только если подключён токен), иначе OCR по фото
       let items: { name: string; quantity: number; unit: string; expires_on: string | null; sum: number | null }[] = []
@@ -46,7 +44,7 @@ export default function Scan() {
         if (!error && data?.items?.length) {
           items = data.items.map((i: { name: string; quantity: number; sum: number }) => ({
             name: i.name, quantity: i.quantity, unit: Number.isInteger(i.quantity) ? 'шт' : 'кг',
-            expires_on: guessExpiry(i.name, new Date(date)), sum: i.sum,
+            expires_on: null, sum: i.sum,
           }))
           setNote('Состав чека получен по QR-коду.')
         }
@@ -54,9 +52,9 @@ export default function Scan() {
       if (!items.length) {
         const text = await recognizeReceipt(file, (p, label) => setProgress({ p, label }))
         setRaw(text)
-        items = parseReceipt(text, new Date(date)).map((i) => ({ ...i }))
+        items = parseReceipt(text).map((i) => ({ ...i }))
       }
-      setRows(items.map((i) => ({ id: crypto.randomUUID(), on: true, name: i.name, quantity: i.quantity, unit: i.unit, expires_on: i.expires_on ?? '', sum: i.sum })))
+      setRows(items.map((i) => ({ id: crypto.randomUUID(), on: true, name: i.name, quantity: i.quantity, unit: i.unit, exp: emptyExpiry(), sum: i.sum })))
       if (!items.length) setErr(code
         ? 'QR прочитан (дата и сумма), но товары найти не удалось: сфотографируйте чек целиком, ровно и при хорошем свете, либо добавьте продукты вручную.'
         : 'Не удалось найти позиции. Попробуйте сфотографировать чек ровнее и при хорошем свете, или добавьте продукты вручную.')
@@ -77,12 +75,6 @@ export default function Scan() {
 
   const patch = (id: string, p: Partial<Row>) => setRows((r) => r && r.map((x) => (x.id === id ? { ...x, ...p } : x)))
 
-  function changeDate(d: string) {
-    setBought(d)
-    // пересчитываем «угаданные» сроки от новой даты покупки
-    setRows((r) => r && r.map((x) => ({ ...x, expires_on: guessExpiry(x.name, new Date(d)) ?? x.expires_on })))
-  }
-
   async function save() {
     if (!space || !session || !rows) return
     const chosen = rows.filter((r) => r.on && r.name.trim())
@@ -91,7 +83,7 @@ export default function Scan() {
     const payload = chosen.map((r) => ({
       id: r.id, space_id: space.id, created_by: session.user.id,
       name: r.name.trim().slice(0, 120), quantity: r.quantity || 1, unit: r.unit || 'шт',
-      expires_on: r.expires_on || null, location: null,
+      ...expiryFields(r.exp), location: null,
     }))
     if (isOffline()) payload.forEach((row) => enqueue({ t: 'insert', table: 'products', row }))
     else {
@@ -108,10 +100,9 @@ export default function Scan() {
       {!rows && (
         <Card className="space-y-3">
           <p className="text-sm text-green-900/80">
-            Сфотографируйте весь чек вместе с QR-кодом (Магнит, Дикси, Пятёрочка и др.): расправьте его и снимайте при хорошем свете. По QR берутся точная дата и сумма покупки.
+            Сфотографируйте весь чек вместе с QR-кодом (Магнит, Дикси, Пятёрочка и др.): расправьте его и снимайте при хорошем свете. QR нужен для проверки суммы чека.
             Распознавание идёт на вашем устройстве, фото никуда не отправляется.
           </p>
-          <div><Label>Дата покупки</Label><Input type="date" value={bought} max={today()} onChange={(e) => setBought(e.target.value)} /></div>
           {busy ? (
             <div className="space-y-2">
               <div className="h-2 overflow-hidden rounded-full bg-green-100"><div className="h-full bg-brand transition-all" style={{ width: `${Math.round(progress.p * 100)}%` }} /></div>
@@ -140,8 +131,7 @@ export default function Scan() {
 
       {rows && (
         <>
-          <p className="text-sm text-green-900/70">Проверьте список: исправьте названия, количество и сроки, снимите галочки с лишнего. Сроки подставлены примерно по типу продукта — сверьте с упаковкой.</p>
-          <div><Label>Дата покупки</Label><Input type="date" value={bought} max={today()} onChange={(e) => changeDate(e.target.value)} /></div>
+          <p className="text-sm text-green-900/70">Проверьте список: исправьте названия и количество, снимите галочки с лишнего. Для каждого продукта укажите дату производства и либо «годен N дней» (дату «годен до» посчитаю сама), либо «годен до даты».</p>
           {rows.map((r) => (
             <Card key={r.id} className={`space-y-2 p-3 ${r.on ? '' : 'opacity-50'}`}>
               <div className="flex items-center gap-2">
@@ -149,14 +139,14 @@ export default function Scan() {
                 <Input value={r.name} onChange={(e) => patch(r.id, { name: e.target.value })} />
                 <Button variant="ghost" size="icon" onClick={() => setRows((x) => x && x.filter((y) => y.id !== r.id))}><Trash2 size={16} className="text-red-600" /></Button>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div><Label>Кол-во</Label><Input type="number" step="any" min="0" value={r.quantity} onChange={(e) => patch(r.id, { quantity: Number(e.target.value) })} /></div>
                 <div><Label>Ед.</Label><Input value={r.unit} onChange={(e) => patch(r.id, { unit: e.target.value })} /></div>
-                <div><Label>Годен до</Label><Input type="date" value={r.expires_on} onChange={(e) => patch(r.id, { expires_on: e.target.value })} /></div>
               </div>
+              <ExpiryField value={r.exp} onChange={(exp) => patch(r.id, { exp })} />
             </Card>
           ))}
-          <Button variant="outline" className="w-full" onClick={() => setRows((x) => (x ?? []).concat({ id: crypto.randomUUID(), on: true, name: '', quantity: 1, unit: 'шт', expires_on: '', sum: null }))}><Plus size={16} />Добавить строку</Button>
+          <Button variant="outline" className="w-full" onClick={() => setRows((x) => (x ?? []).concat({ id: crypto.randomUUID(), on: true, name: '', quantity: 1, unit: 'шт', exp: emptyExpiry(), sum: null }))}><Plus size={16} />Добавить строку</Button>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={() => { setRows(null); setErr(null) }}>Заново</Button>
             <Button onClick={save} disabled={saving}>Добавить ({rows.filter((r) => r.on && r.name.trim()).length})</Button>

@@ -7,13 +7,15 @@ import { cacheGet, cacheSet } from '@/lib/cache'
 import { compressImage } from '@/lib/image'
 import { enqueue, flush, isOffline } from '@/lib/outbox'
 import { cn, daysLeft } from '@/lib/utils'
+import { ExpiryField } from '@/components/ExpiryField'
+import { emptyExpiry, expiryFields, fmt } from '@/lib/expiry'
 import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card } from '@/components/ui/card'
 
 const PAGE = 30
-const COLS = 'id,space_id,name,category,quantity,unit,location,expires_on,notes,photo_path,status'
+const COLS = 'id,space_id,name,category,quantity,unit,location,expires_on,produced_on,notes,photo_path,status'
 
 function ExpiryBadge({ date }: { date: string | null }) {
   const d = daysLeft(date)
@@ -32,6 +34,7 @@ export default function Products() {
   const [more, setMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [exp, setExp] = useState(emptyExpiry())
 
   const load = useCallback(async (from: number) => {
     if (!space) return
@@ -79,7 +82,7 @@ export default function Products() {
       name: String(f.get('name')).trim(),
       quantity: Number(f.get('quantity') || 1), unit: String(f.get('unit') || 'шт'),
       location: String(f.get('location') || '') || null,
-      expires_on: String(f.get('expires_on') || '') || null,
+      ...expiryFields(exp),
     }
     if (file?.size && !isOffline()) {
       const blob = await compressImage(file)
@@ -89,7 +92,7 @@ export default function Products() {
     }
     if (isOffline()) { enqueue({ t: 'insert', table: 'products', row }); setItems((l) => [row as unknown as Product, ...l]) }
     else { await supabase.from('products').insert(row); await load(0) }
-    setAdding(false)
+    setAdding(false); setExp(emptyExpiry())
   }
 
   return (
@@ -108,8 +111,8 @@ export default function Products() {
             <div className="col-span-2"><Label>Название</Label><Input name="name" required maxLength={120} autoFocus /></div>
             <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
             <div><Label>Единица</Label><Input name="unit" defaultValue="шт" /></div>
-            <div><Label>Годен до</Label><Input name="expires_on" type="date" /></div>
-            <div><Label>Место</Label><Input name="location" placeholder="холодильник" /></div>
+            <div className="col-span-2"><Label>Место</Label><Input name="location" placeholder="холодильник" /></div>
+            <div className="col-span-2"><ExpiryField value={exp} onChange={setExp} /></div>
             <div className="col-span-2">
               <Label>Фото (сжимается перед загрузкой)</Label>
               <Input name="photo" type="file" accept="image/*" capture="environment" className="h-auto py-2" />
@@ -134,7 +137,7 @@ export default function Products() {
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium">{p.name}</div>
             <div className="flex items-center gap-2 text-xs text-green-900/60">
-              <span>{p.quantity} {p.unit}</span>{p.location && <span>· {p.location}</span>}
+              <span>{p.quantity} {p.unit}</span>{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
             </div>
           </div>
           <ExpiryBadge date={p.expires_on} />
