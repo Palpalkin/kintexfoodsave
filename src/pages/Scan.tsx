@@ -6,11 +6,12 @@ import { useApp } from '@/lib/session'
 import { enqueue, isOffline } from '@/lib/outbox'
 import { recognizeReceipt } from '@/lib/ocr'
 import { guessExpiry, parseReceipt } from '@/lib/receipt'
+import { readReceiptQr, type FiscalQr } from '@/lib/qr'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 
-type Row = { id: string; on: boolean; name: string; quantity: number; unit: string; expires_on: string }
+type Row = { id: string; on: boolean; name: string; quantity: number; unit: string; expires_on: string; sum: number | null }
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -24,20 +25,55 @@ export default function Scan() {
   const [bought, setBought] = useState(today())
   const [err, setErr] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [qr, setQr] = useState<FiscalQr | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
   async function onFile(file?: File) {
     if (!file) return
-    setBusy(true); setErr(null); setRows(null)
+    setBusy(true); setErr(null); setRows(null); setQr(null); setNote(null)
     try {
-      const text = await recognizeReceipt(file, (p, label) => setProgress({ p, label }))
-      setRaw(text)
-      const items = parseReceipt(text, new Date(bought))
-      setRows(items.map((i) => ({ id: crypto.randomUUID(), on: true, name: i.name, quantity: i.quantity, unit: i.unit, expires_on: i.expires_on ?? '' })))
-      if (!items.length) setErr('Не удалось найти позиции. Попробуйте сфотографировать чек ровнее и при хорошем свете, или добавьте продукты вручную.')
+      // 1) QR чека: точная дата покупки и сумма (быстро, на устройстве)
+      setProgress({ p: 0.03, label: 'Ищу QR-код…' })
+      const code = await readReceiptQr(file).catch(() => null)
+      const date = code?.date ?? bought
+      if (code) { setQr(code); if (code.date) setBought(code.date) }
+
+      // 2) Позиции по QR через сервис (работает только если подключён токен), иначе OCR по фото
+      let items: { name: string; quantity: number; unit: string; expires_on: string | null; sum: number | null }[] = []
+      if (code && !isOffline()) {
+        setProgress({ p: 0.08, label: 'Запрашиваю состав чека…' })
+        const { data, error } = await supabase.functions.invoke('receipt-lookup', { body: { qr: code.raw } })
+        if (!error && data?.items?.length) {
+          items = data.items.map((i: { name: string; quantity: number; sum: number }) => ({
+            name: i.name, quantity: i.quantity, unit: Number.isInteger(i.quantity) ? 'шт' : 'кг',
+            expires_on: guessExpiry(i.name, new Date(date)), sum: i.sum,
+          }))
+          setNote('Состав чека получен по QR-коду.')
+        }
+      }
+      if (!items.length) {
+        const text = await recognizeReceipt(file, (p, label) => setProgress({ p, label }))
+        setRaw(text)
+        items = parseReceipt(text, new Date(date)).map((i) => ({ ...i }))
+      }
+      setRows(items.map((i) => ({ id: crypto.randomUUID(), on: true, name: i.name, quantity: i.quantity, unit: i.unit, expires_on: i.expires_on ?? '', sum: i.sum })))
+      if (!items.length) setErr(code
+        ? 'QR прочитан (дата и сумма), но товары найти не удалось: сфотографируйте чек целиком, ровно и при хорошем свете, либо добавьте продукты вручную.'
+        : 'Не удалось найти позиции. Попробуйте сфотографировать чек ровнее и при хорошем свете, или добавьте продукты вручную.')
     } catch (e) {
       setErr('Ошибка распознавания: ' + (e instanceof Error ? e.message : String(e)))
     } finally { setBusy(false) }
   }
+
+  // Сверка с суммой из QR: помогает заметить пропущенные при распознавании позиции
+  const check = (() => {
+    if (!qr?.sum || !rows) return null
+    const known = rows.filter((r) => r.on && r.sum !== null)
+    if (!known.length) return null
+    const total = Math.round(known.reduce((a, r) => a + (r.sum ?? 0), 0) * 100) / 100
+    const diff = Math.round((qr.sum - total) * 100) / 100
+    return { total, diff, ok: Math.abs(diff) < 0.05 }
+  })()
 
   const patch = (id: string, p: Partial<Row>) => setRows((r) => r && r.map((x) => (x.id === id ? { ...x, ...p } : x)))
 
@@ -72,7 +108,7 @@ export default function Scan() {
       {!rows && (
         <Card className="space-y-3">
           <p className="text-sm text-green-900/80">
-            Сфотографируйте чек (Магнит, Дикси, Пятёрочка и др.): расправьте его, снимайте при хорошем свете, чтобы был виден весь текст.
+            Сфотографируйте весь чек вместе с QR-кодом (Магнит, Дикси, Пятёрочка и др.): расправьте его и снимайте при хорошем свете. По QR берутся точная дата и сумма покупки.
             Распознавание идёт на вашем устройстве, фото никуда не отправляется.
           </p>
           <div><Label>Дата покупки</Label><Input type="date" value={bought} max={today()} onChange={(e) => setBought(e.target.value)} /></div>
@@ -87,6 +123,16 @@ export default function Scan() {
               <Button asChild variant="outline"><label>Из галереи<input type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0])} /></label></Button>
             </div>
           )}
+        </Card>
+      )}
+
+      {qr && (
+        <Card className="border-green-200 bg-green-50 text-sm text-green-900">
+          QR-код прочитан{qr.date ? `: чек от ${qr.date.split('-').reverse().join('.')}` : ''}{qr.sum ? `, сумма ${qr.sum.toFixed(2).replace('.', ',')} ₽` : ''}.
+          {note && <> {note}</>}
+          {check && (check.ok
+            ? <> Сумма позиций сходится ✓</>
+            : <span className="text-orange-800"> Сумма распознанных позиций {check.total.toFixed(2).replace('.', ',')} ₽, не хватает {check.diff.toFixed(2).replace('.', ',')} ₽: возможно, часть товаров не распознана, проверьте список.</span>)}
         </Card>
       )}
 
@@ -110,7 +156,7 @@ export default function Scan() {
               </div>
             </Card>
           ))}
-          <Button variant="outline" className="w-full" onClick={() => setRows((x) => (x ?? []).concat({ id: crypto.randomUUID(), on: true, name: '', quantity: 1, unit: 'шт', expires_on: '' }))}><Plus size={16} />Добавить строку</Button>
+          <Button variant="outline" className="w-full" onClick={() => setRows((x) => (x ?? []).concat({ id: crypto.randomUUID(), on: true, name: '', quantity: 1, unit: 'шт', expires_on: '', sum: null }))}><Plus size={16} />Добавить строку</Button>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={() => { setRows(null); setErr(null) }}>Заново</Button>
             <Button onClick={save} disabled={saving}>Добавить ({rows.filter((r) => r.on && r.name.trim()).length})</Button>

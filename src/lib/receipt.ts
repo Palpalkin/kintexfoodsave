@@ -1,5 +1,5 @@
 // Разбор текста кассового чека (Магнит, Дикси, Пятёрочка и т.п.) в список позиций.
-export type ReceiptItem = { name: string; quantity: number; unit: string; expires_on: string | null; guessed: boolean }
+export type ReceiptItem = { name: string; quantity: number; unit: string; expires_on: string | null; guessed: boolean; sum: number | null }
 
 // \b в JS не понимает кириллицу, поэтому границы слов задаём через lookaround.
 const W = (src: string) => new RegExp(`(?<![а-яёa-z0-9])(?:${src})(?![а-яёa-z0-9])`, 'i')
@@ -52,9 +52,10 @@ export function parseReceipt(text: string, bought = new Date()): ReceiptItem[] {
   for (const raw of lines) {
     if (STOP.test(raw)) break
     // строка количества: «2 x 49.90», «0.540 кг x 99.90», «2 шт х 49,90 = 99,80»
-    const q = raw.match(/^(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|шт)?\s*[xх*×]\s*\d+(?:[.,]\d+)?/i)
+    const q = raw.match(/^(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|шт)?\s*[xх*×]\s*(\d+(?:[.,]\d+)?)(?:\s*=?\s*(\d+[.,]\d{2}))?/i)
     if (q && last) {
       last.quantity = num(q[1]); if (q[2]) last.unit = q[2].toLowerCase()
+      last.sum = q[4] ? num(q[4]) : Math.round(num(q[1]) * num(q[3]) * 100) / 100
       continue
     }
     const letters = (raw.match(/[A-Za-zА-Яа-яЁё]/g) ?? []).length
@@ -62,10 +63,12 @@ export function parseReceipt(text: string, bought = new Date()): ReceiptItem[] {
     const name = clean(raw)
     if (name.replace(/[^A-Za-zА-Яа-яЁё]/g, '').length < 3) continue
     // количество в той же строке: «МОЛОКО 2 х 89.99»
-    const inline = raw.match(/\s(\d+(?:[.,]\d+)?)\s*(кг|шт)?\s*[xх*×]\s*\d+[.,]\d{2}/i)
+    const inline = raw.match(/\s(\d+(?:[.,]\d+)?)\s*(кг|шт)?\s*[xх*×]\s*(\d+[.,]\d{2})(?:\s*=?\s*(\d+[.,]\d{2}))?/i)
+    const trailing = raw.match(/(\d+[.,]\d{2})\s*$/)
     const item: ReceiptItem = {
       name, quantity: inline ? num(inline[1]) : 1, unit: inline?.[2]?.toLowerCase() ?? 'шт',
       expires_on: guessExpiry(name, bought), guessed: true,
+      sum: inline ? (inline[4] ? num(inline[4]) : Math.round(num(inline[1]) * num(inline[3]) * 100) / 100) : trailing ? num(trailing[1]) : null,
     }
     items.push(item); last = item
   }
