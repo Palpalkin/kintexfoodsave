@@ -108,6 +108,7 @@ export default function Settings() {
           {expMsg && <p className="text-xs text-green-900/80">{expMsg}</p>}
         </Card>
       )}
+      <Button variant="outline" className="w-full" onClick={() => window.dispatchEvent(new Event('fs-tour'))}>Показать приветствие</Button>
       <Button variant="outline" className="w-full" onClick={() => supabase.auth.signOut()}>Выйти из аккаунта</Button>
     </div>
   )

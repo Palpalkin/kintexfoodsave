@@ -13,6 +13,7 @@ import Shopping from '@/pages/Shopping'
 import Family from '@/pages/Family'
 import Settings from '@/pages/Settings'
 import Scan from '@/pages/Scan'
+import { Onboarding, onboardingSeen } from '@/components/Onboarding'
 
 const tabs = [
   { to: '/', label: 'Продукты', icon: Apple },
@@ -41,6 +42,8 @@ async function notifyExpiring(spaceId: string) {
 function Shell() {
   const { session, ready, space, recovery, clearRecovery } = useApp()
   const loc = useLocation()
+  const [tour, setTour] = useState(!onboardingSeen())
+  useEffect(() => { const f = () => setTour(true); window.addEventListener('fs-tour', f); return () => window.removeEventListener('fs-tour', f) }, [])
   useEffect(() => { if (space) void notifyExpiring(space.id) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [pending, setPending] = useState(pendingCount())
   useEffect(() => { void flush() }, [session])
@@ -64,6 +67,7 @@ function Shell() {
           Ожидает отправки: {pending}. {navigator.onLine ? 'Нажмите, чтобы отправить сейчас.' : 'Нет связи: отправится автоматически, когда появится интернет.'}
         </button>
       )}
+      {tour && <Onboarding onClose={() => setTour(false)} />}
       <main key={loc.pathname} className="fs-fade flex-1 p-4 pb-24">
         <Routes>
           <Route path="/" element={<Products />} />
