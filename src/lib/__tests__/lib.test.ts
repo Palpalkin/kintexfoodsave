@@ -52,3 +52,11 @@ describe('receipt parser', () => {
     expect(items.every((i) => i.expires_on === null)).toBe(true)
   })
 })
+
+import { toCsv } from '../export'
+describe('csv export', () => {
+  it('escapes and adds BOM', () => {
+    const c = toCsv([{ a: 'x;y', b: 'say "hi"' }], ['a', 'b'])
+    expect(c).toBe('﻿a;b\r\n"x;y";"say ""hi"""')
+  })
+})

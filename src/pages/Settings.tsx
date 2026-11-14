@@ -4,6 +4,7 @@ import { useApp } from '@/lib/session'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { exportData } from '@/lib/export'
 import { autoShopEnabled, setAutoShop } from '@/lib/shopping'
 import { currentSubscription, disablePush, enablePush, isIos, isStandalone, pushSupported, testPush } from '@/lib/push'
 
@@ -15,6 +16,7 @@ export default function Settings() {
   const [autoShop, setAutoShopState] = useState(autoShopEnabled())
   const [pushMsg, setPushMsg] = useState<string | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
+  const [expMsg, setExpMsg] = useState<string | null>(null)
   useEffect(() => { void currentSubscription().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
 
   useEffect(() => {
@@ -80,6 +82,16 @@ export default function Settings() {
           <p className="text-xs text-green-900/60">Раз в день в 09:00 (Москва) приходит сводка: что просрочено и что скоро испортится. Порог задаётся выше.</p>
         </div>
       </Card>
+      {space && (
+        <Card className="space-y-2">
+          <h3 className="font-semibold">Экспорт данных</h3>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={async () => setExpMsg(await exportData(space.id, 'csv'))}>CSV (Excel)</Button>
+            <Button variant="outline" className="flex-1" onClick={async () => setExpMsg(await exportData(space.id, 'json'))}>JSON-копия</Button>
+          </div>
+          {expMsg && <p className="text-xs text-green-900/80">{expMsg}</p>}
+        </Card>
+      )}
       <Button variant="outline" className="w-full" onClick={() => supabase.auth.signOut()}>Выйти из аккаунта</Button>
     </div>
   )
