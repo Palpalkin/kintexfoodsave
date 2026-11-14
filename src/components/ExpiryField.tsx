@@ -8,7 +8,7 @@ export function ExpiryField({ value: v, onChange }: Props) {
   const set = (p: Partial<ExpiryState>) => onChange({ ...v, ...p })
   const result = computeExpiry(v)
   const seg = (active: boolean) => cn('h-9 flex-1 rounded-lg border text-sm font-medium transition-colors',
-    active ? 'border-brand bg-brand text-white' : 'border-green-200 bg-white text-green-900')
+    active ? 'border-brand bg-brand-solid text-[#ffffff]' : 'border-green-200 bg-white text-green-900')
 
   return (
     <div className="space-y-2">

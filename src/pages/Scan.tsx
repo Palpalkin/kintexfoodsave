@@ -105,7 +105,7 @@ export default function Scan() {
           </p>
           {busy ? (
             <div className="space-y-2">
-              <div className="h-2 overflow-hidden rounded-full bg-green-100"><div className="h-full bg-brand transition-all" style={{ width: `${Math.round(progress.p * 100)}%` }} /></div>
+              <div className="h-2 overflow-hidden rounded-full bg-green-100"><div className="h-full bg-brand-solid transition-all" style={{ width: `${Math.round(progress.p * 100)}%` }} /></div>
               <p className="text-sm text-green-900/70">{progress.label}</p>
             </div>
           ) : (

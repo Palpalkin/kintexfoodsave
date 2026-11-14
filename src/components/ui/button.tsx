@@ -8,10 +8,10 @@ const variants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-brand text-white hover:bg-green-800',
+        default: 'bg-brand-solid text-[#ffffff] hover:bg-brand-solid-hover',
         outline: 'border border-green-200 bg-white hover:bg-brand-soft',
         ghost: 'hover:bg-brand-soft',
-        danger: 'bg-red-600 text-white hover:bg-red-700',
+        danger: 'bg-red-600 text-[#ffffff] hover:bg-red-700',
       },
       size: { default: 'h-10 px-4', sm: 'h-8 px-3', icon: 'h-9 w-9' },
     },

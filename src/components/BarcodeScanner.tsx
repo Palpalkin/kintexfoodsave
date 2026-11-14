@@ -46,9 +46,9 @@ export function BarcodeScanner({ onDetect, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/90 p-4">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3">
-        <div className="flex items-center justify-between text-white">
+        <div className="flex items-center justify-between text-[#ffffff]">
           <span className="font-medium">Наведите камеру на штрихкод</span>
-          <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onClose}><X /></Button>
+          <Button variant="ghost" size="icon" className="text-[#ffffff] hover:bg-white/10" onClick={onClose}><X /></Button>
         </div>
         <div className="relative overflow-hidden rounded-xl bg-black">
           <video ref={video} playsInline muted className="aspect-[4/3] w-full object-cover" />

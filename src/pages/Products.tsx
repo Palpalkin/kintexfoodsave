@@ -217,7 +217,7 @@ export default function Products() {
   }, [items, q, filter])
 
   const chip = (f: Filter, label: string, n?: number, tone = '') => (
-    <button key={f} onClick={() => setFilter(f)} className={cn('h-8 rounded-full border px-3 text-xs font-medium', filter === f ? 'border-brand bg-brand text-white' : 'border-green-200 bg-white ' + tone)}>
+    <button key={f} onClick={() => setFilter(f)} className={cn('h-8 rounded-full border px-3 text-xs font-medium', filter === f ? 'border-brand bg-brand-solid text-[#ffffff]' : 'border-green-200 bg-white ' + tone)}>
       {label}{n !== undefined && n > 0 ? ` · ${n}` : ''}
     </button>
   )
@@ -316,7 +316,7 @@ export default function Products() {
       {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>Показать ещё</Button>}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-green-950 px-4 py-3 text-sm text-white shadow-lg">
+        <div className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-green-950 px-4 py-3 text-sm text-[#ffffff] shadow-lg">
           <span>{toast.text}</span>
           {toast.action && <button className="shrink-0 font-semibold text-green-300 underline" onClick={toast.action.run}>{toast.action.label}</button>}
         </div>

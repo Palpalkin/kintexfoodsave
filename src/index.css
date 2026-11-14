@@ -3,8 +3,27 @@
 @theme {
   --color-brand: #15803d;
   --color-brand-soft: #dcfce7;
+  --color-brand-solid: #15803d;
+  --color-brand-solid-hover: #166534;
   --color-surface: #f6faf5;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Тёмная тема: по настройке системы. Переопределяем палитру, поэтому классы компонентов менять не нужно. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-surface: #0d1710;
+    --color-white: #16241b;
+    --color-brand: #4ade80;
+    --color-brand-soft: #1d3a29;
+    --color-green-50: #14231a; --color-green-100: #213a2b; --color-green-200: #2f4f3b; --color-green-300: #4a7a5c;
+    --color-green-800: #bbf7d0; --color-green-900: #dcfce7; --color-green-950: #052e16;
+    --color-red-100: #4c1d1d; --color-red-600: #f87171; --color-red-700: #fca5a5; --color-red-800: #fecaca;
+    --color-orange-50: #3a2410; --color-orange-100: #4a2e12; --color-orange-200: #6b4420; --color-orange-800: #fed7aa; --color-orange-900: #ffedd5;
+    --color-yellow-100: #453a0f; --color-yellow-800: #fef08a;
+    --color-gray-100: #26302a; --color-gray-500: #9ca3af; --color-gray-600: #b8c0bb;
+  }
 }
 
 html, body, #root { height: 100%; }
@@ -20,3 +39,6 @@ body {
 .fs-fade { animation: fs-fade .25s ease-out; }
 @media (prefers-reduced-motion: reduce) { .fs-fade { animation: none; } }
 button:active { transform: scale(.98); }
+
+input, select, textarea { color: inherit; }
+@media (prefers-color-scheme: dark) { body { color: #e6f4ea; } ::placeholder { color: #6b8a76; } }
