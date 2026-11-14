@@ -17,11 +17,15 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card } from '@/components/ui/card'
 import { SwipeRow } from '@/components/SwipeRow'
+import { findPhoto } from '@/lib/photo'
+import { favKey, loadFavs, toggleFav } from '@/lib/favorites'
+import { Star } from 'lucide-react'
 import { typicalDays } from '@/lib/shelf'
 import { foodEmoji } from '@/lib/emoji'
 
 const PAGE = 30
-const COLS = 'id,space_id,name,category,quantity,unit,location,expires_on,produced_on,notes,photo_path,status'
+const photoTried = new Set<string>()
+const COLS = 'id,space_id,name,category,quantity,unit,location,expires_on,produced_on,notes,photo_path,photo_url,brand,barcode,status'
 
 function edgeTone(date: string | null) {
   const d = daysLeft(date)
@@ -50,6 +54,8 @@ export default function Products() {
   const { space, session } = useApp()
   const [items, setItems] = useState<Product[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
+  const [favs, setFavs] = useState<Set<string>>(new Set())
+  const [badImg, setBadImg] = useState<Set<string>>(new Set())
   const [more, setMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -95,6 +101,33 @@ export default function Products() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load(0) }, [space?.id])
+  useEffect(() => { if (space) void loadFavs(space.id).then((l) => setFavs(new Set(l.map((f) => f.name_key)))) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Фото из открытой базы для продуктов без своего фото: по несколько штук за раз, результат запоминается в записи.
+  useEffect(() => {
+    const todo = items.filter((p) => !p.photo_path && !p.photo_url && !photoTried.has(p.id)).slice(0, 4)
+    if (!todo.length || isOffline()) return
+    let off = false
+    void (async () => {
+      for (const p of todo) {
+        photoTried.add(p.id)
+        const hit = await findPhoto(p.name, p.barcode)
+        if (off || !hit) continue
+        setItems((l) => l.map((x) => (x.id === p.id ? { ...x, photo_url: hit.url, brand: x.brand ?? hit.brand } : x)))
+        await supabase.from('products').update({ photo_url: hit.url, brand: p.brand ?? hit.brand }).eq('id', p.id)
+      }
+    })()
+    return () => { off = true }
+  }, [items])
+
+  async function star(p: Product) {
+    if (!space || !session) return
+    const k = favKey(p.name); const on = !favs.has(k)
+    setFavs((s) => { const n = new Set(s); if (on) n.add(k); else n.delete(k); return n })
+    const err = await toggleFav(space.id, session.user.id, p.name, p.unit, on)
+    if (err) { setFavs((s) => { const n = new Set(s); if (on) n.delete(k); else n.add(k); return n }); setToast({ text: 'Не удалось изменить: ' + err }) }
+    else setToast({ text: on ? `«${p.name}» — в любимых: закончится — предложим купить снова` : 'Убрано из любимых' })
+  }
   useEffect(() => {
     const on = async () => { if (await flush()) void load(0) }
     window.addEventListener('online', on)
@@ -139,7 +172,7 @@ export default function Products() {
     if (!r.ok) { setItems((l) => [p, ...l]); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
     if (!space || !session) return
     const shop = () => addToShopping(space.id, session.user.id, { name: p.name, unit: p.unit })
-    if (status === 'consumed' && autoShopEnabled()) {
+    if (status === 'consumed' && (autoShopEnabled() || favs.has(favKey(p.name)))) {
       const r = await shop()
       setToast({ text: r === 'added' ? `«${p.name}» добавлено в список покупок` : `«${p.name}» уже в списке покупок` })
     } else if (status === 'discarded') {
@@ -300,11 +333,16 @@ export default function Products() {
         <SwipeRow key={p.id} onRight={() => setStatus(p, 'consumed')} onLeft={() => setStatus(p, 'discarded')} style={{ animationDelay: `${Math.min(idx, 10) * 45}ms` }} className="fs-rise"><Card className={cn("flex items-start gap-3 border-l-4 p-3", edgeTone(p.expires_on))}>
           {p.photo_path && thumbs[p.photo_path]
             ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-            : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl">{foodEmoji(p.name)}</div>}
+            : p.photo_url && !badImg.has(p.id)
+              ? <img src={p.photo_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBadImg((b) => new Set(b).add(p.id))} className="h-12 w-12 shrink-0 rounded-lg bg-white object-contain" />
+              : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl">{foodEmoji(p.name)}</div>}
           <div className="min-w-0 flex-1">
-            <div className="break-words font-medium leading-snug">{p.name}</div>
+            <div className="flex items-start gap-1">
+              <span className="min-w-0 break-words font-medium leading-snug">{p.name}</span>
+              <button type="button" aria-label="Любимый" aria-pressed={favs.has(favKey(p.name))} onClick={() => void star(p)} className="shrink-0 p-0.5"><Star size={16} className={favs.has(favKey(p.name)) ? 'fill-yellow-400 text-yellow-500' : 'text-green-900/30'} /></button>
+            </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">
-              <span>{p.quantity} {p.unit}</span>{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
+              <span>{p.quantity} {p.unit}</span>{p.brand && <span>· {p.brand}</span>}{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
             </div>
             <div className="mt-1.5"><ExpiryBadge date={p.expires_on} /></div>
           </div>

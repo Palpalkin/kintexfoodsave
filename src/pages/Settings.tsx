@@ -123,6 +123,7 @@ export default function Settings() {
         }}>Удалить аккаунт и данные</Button>
       </Card>
       <Button variant="outline" className="w-full" onClick={() => supabase.auth.signOut()}>Выйти из аккаунта</Button>
+      <p className="text-center text-xs text-green-900/50">Фото и бренды продуктов: Open Food Facts (CC BY-SA)</p>
       <LegalLinks />
     </div>
   )

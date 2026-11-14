@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PackagePlus, Plus, Trash2 } from 'lucide-react'
+import { PackagePlus, Plus, Star, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { flush, isOffline, run } from '@/lib/outbox'
 import { cn } from '@/lib/utils'
+import { addToShopping } from '@/lib/shopping'
+import { loadFavs, type Fav } from '@/lib/favorites'
 import type { ShoppingItem } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +18,8 @@ export default function Shopping() {
   const nav = useNavigate()
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [name, setName] = useState('')
+  const [favs, setFavs] = useState<Fav[]>([])
+  useEffect(() => { if (space) void loadFavs(space.id).then(setFavs) }, [space])
 
   const load = useCallback(async () => {
     if (!space) return
@@ -63,6 +67,19 @@ export default function Shopping() {
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Что купить?" maxLength={120} />
         <Button size="icon" title="Добавить"><Plus size={18} /></Button>
       </form>
+
+      {favs.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="flex items-center gap-1 text-xs font-medium text-green-900/60"><Star size={12} className="fill-yellow-400 text-yellow-500" />Любимые — нажмите, чтобы добавить</p>
+          <div className="flex flex-wrap gap-1.5">
+            {favs.map((f) => {
+              const inList = items.some((i) => !i.checked && i.name.toLowerCase() === f.name.toLowerCase())
+              return <button key={f.name_key} disabled={inList} onClick={async () => { if (space && session) { await addToShopping(space.id, session.user.id, { name: f.name, unit: f.unit }); await load() } }}
+                className={cn('rounded-full border px-3 py-1 text-xs', inList ? 'border-green-100 text-green-900/40' : 'border-green-200 bg-white')}>{inList ? '✓ ' : '+ '}{f.name}</button>
+            })}
+          </div>
+        </div>
+      )}
 
       {!items.length && <p className="py-10 text-center text-sm text-green-900/60">Список пуст. Когда вы отметите продукт «использовано», он сам попадёт сюда, чтобы не забыть купить снова.</p>}
 
