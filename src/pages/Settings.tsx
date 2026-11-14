@@ -16,6 +16,7 @@ export default function Settings() {
   const [autoShop, setAutoShopState] = useState(autoShopEnabled())
   const [pushMsg, setPushMsg] = useState<string | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
+  const [spent, setSpent] = useState<{ month: number; thrown: number } | null>(null)
   const [expMsg, setExpMsg] = useState<string | null>(null)
   useEffect(() => { void currentSubscription().then((s) => setPushOn(!!s)).catch(() => {}) }, [])
 
@@ -29,6 +30,12 @@ export default function Settings() {
     const since = new Date(Date.now() - 30 * 86400000).toISOString()
     const count = (status: string) => supabase.from('products').select('id', { count: 'exact', head: true }).eq('space_id', space.id).eq('status', status).gte('updated_at', since)
     Promise.all([count('consumed'), count('discarded')]).then(([a, b]) => setStat({ eaten: a.count ?? 0, thrown: b.count ?? 0 }))
+    const m = new Date(); m.setDate(1); m.setHours(0, 0, 0, 0)
+    supabase.from('products').select('price,status,created_at').eq('space_id', space.id).not('price', 'is', null).gte('created_at', m.toISOString()).limit(2000)
+      .then(({ data }) => {
+        const rows = data ?? []
+        setSpent({ month: rows.reduce((a, r) => a + Number(r.price), 0), thrown: rows.filter((r) => r.status === 'discarded').reduce((a, r) => a + Number(r.price), 0) })
+      })
   }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
@@ -82,6 +89,15 @@ export default function Settings() {
           <p className="text-xs text-green-900/60">Раз в день в 09:00 (Москва) приходит сводка: что просрочено и что скоро испортится. Порог задаётся выше.</p>
         </div>
       </Card>
+      {spent && spent.month > 0 && (
+        <Card className="space-y-1">
+          <p className="text-xs font-medium text-green-900/60">Траты по чекам в этом месяце</p>
+          <div className="flex gap-6">
+            <div><div className="text-2xl font-bold">{Math.round(spent.month).toLocaleString('ru-RU')} ₽</div><div className="text-xs text-green-900/60">куплено</div></div>
+            <div><div className="text-2xl font-bold text-red-600">{Math.round(spent.thrown).toLocaleString('ru-RU')} ₽</div><div className="text-xs text-green-900/60">выброшено</div></div>
+          </div>
+        </Card>
+      )}
       {space && (
         <Card className="space-y-2">
           <h3 className="font-semibold">Экспорт данных</h3>

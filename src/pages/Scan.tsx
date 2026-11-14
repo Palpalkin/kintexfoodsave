@@ -83,7 +83,7 @@ export default function Scan() {
     const payload = chosen.map((r) => ({
       id: r.id, space_id: space.id, created_by: session.user.id,
       name: r.name.trim().slice(0, 120), quantity: r.quantity || 1, unit: r.unit || 'шт',
-      ...expiryFields(r.exp), location: null,
+      ...expiryFields(r.exp), location: null, price: r.sum,
     }))
     if (isOffline()) payload.forEach((row) => enqueue({ t: 'insert', table: 'products', row }))
     else {

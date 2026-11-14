@@ -16,9 +16,19 @@ import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card } from '@/components/ui/card'
+import { foodEmoji } from '@/lib/emoji'
 
 const PAGE = 30
 const COLS = 'id,space_id,name,category,quantity,unit,location,expires_on,produced_on,notes,photo_path,status'
+
+function edgeTone(date: string | null) {
+  const d = daysLeft(date)
+  if (d === null) return 'border-l-gray-200'
+  if (d <= 0) return 'border-l-red-500'
+  if (d <= 3) return 'border-l-orange-400'
+  if (d <= 7) return 'border-l-yellow-400'
+  return 'border-l-green-500'
+}
 
 type Filter = 'all' | 'soon' | 'expired'
 
@@ -215,7 +225,7 @@ export default function Products() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Продукты</h2>
+        <div className="flex items-center gap-2.5"><img src="/icon-192.png" alt="" className="h-9 w-9 rounded-xl shadow-sm" /><h2 className="text-xl font-bold tracking-tight">Продукты</h2></div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />Чек</Link></Button>
           <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Добавить'}</Button>
@@ -285,10 +295,10 @@ export default function Products() {
           </form>
         </Card>
       ) : (
-        <Card key={p.id} className="flex items-start gap-3 p-3">
+        <Card key={p.id} className={cn("flex items-start gap-3 border-l-4 p-3", edgeTone(p.expires_on))}>
           {p.photo_path && thumbs[p.photo_path]
             ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-            : <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-soft" />}
+            : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl">{foodEmoji(p.name)}</div>}
           <div className="min-w-0 flex-1">
             <div className="break-words font-medium leading-snug">{p.name}</div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">

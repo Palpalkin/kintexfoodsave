@@ -15,3 +15,8 @@ body {
   padding-top: env(safe-area-inset-top);
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes fs-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fs-fade { animation: fs-fade .25s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fs-fade { animation: none; } }
+button:active { transform: scale(.98); }

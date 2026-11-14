@@ -63,7 +63,7 @@ function Shell() {
           Ожидает отправки: {pending}. {navigator.onLine ? 'Нажмите, чтобы отправить сейчас.' : 'Нет связи: отправится автоматически, когда появится интернет.'}
         </button>
       )}
-      <main className="flex-1 p-4 pb-24">
+      <main className="fs-fade flex-1 p-4 pb-24">
         <Routes>
           <Route path="/" element={<Products />} />
           <Route path="/scan" element={<Scan />} />
@@ -74,11 +74,13 @@ function Shell() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
-      <nav className="fixed inset-x-0 bottom-0 border-t border-green-100 bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 border-t border-green-100 bg-white/90 backdrop-blur pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-xl">
           {tabs.map(({ to, label, icon: I }) => (
-            <NavLink key={to} to={to} end className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-0.5 py-2 text-xs', isActive ? 'text-brand font-semibold' : 'text-gray-500')}>
-              <I size={20} />{label}
+            <NavLink key={to} to={to} end className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors', isActive ? 'text-brand font-semibold' : 'text-gray-500')}>
+              {({ isActive }: { isActive: boolean }) => <>
+                <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-brand-soft')}><I size={20} /></span>{label}
+              </>}
             </NavLink>
           ))}
         </div>
