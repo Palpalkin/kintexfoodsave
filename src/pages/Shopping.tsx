@@ -4,7 +4,7 @@ import { PackagePlus, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
-import { enqueue, flush, isOffline } from '@/lib/outbox'
+import { flush, isOffline, run } from '@/lib/outbox'
 import { cn } from '@/lib/utils'
 import type { ShoppingItem } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -35,27 +35,23 @@ export default function Shopping() {
     if (!space || !session || !name.trim()) return
     const row = { id: crypto.randomUUID(), space_id: space.id, created_by: session.user.id, name: name.trim(), quantity: 1, unit: 'шт' }
     save([{ ...row, checked: false }, ...items]); setName('')
-    if (isOffline()) enqueue({ t: 'insert', table: 'shopping_items', row })
-    else await supabase.from('shopping_items').insert(row)
+    await run({ t: 'insert', table: 'shopping_items', row })
   }
 
   async function toggle(it: ShoppingItem) {
     save(items.map((x) => (x.id === it.id ? { ...x, checked: !x.checked } : x)).sort((a, b) => Number(a.checked) - Number(b.checked)))
-    if (isOffline()) enqueue({ t: 'update', table: 'shopping_items', id: it.id, patch: { checked: !it.checked } })
-    else await supabase.from('shopping_items').update({ checked: !it.checked }).eq('id', it.id)
+    await run({ t: 'update', table: 'shopping_items', id: it.id, patch: { checked: !it.checked } })
   }
 
   async function remove(id: string) {
     save(items.filter((x) => x.id !== id))
-    if (isOffline()) enqueue({ t: 'delete', table: 'shopping_items', id })
-    else await supabase.from('shopping_items').delete().eq('id', id)
+    await run({ t: 'delete', table: 'shopping_items', id })
   }
 
   async function clearBought() {
     const ids = items.filter((x) => x.checked).map((x) => x.id)
     save(items.filter((x) => !x.checked))
-    if (isOffline()) ids.forEach((id) => enqueue({ t: 'delete', table: 'shopping_items', id }))
-    else await supabase.from('shopping_items').delete().in('id', ids)
+    for (const id of ids) await run({ t: 'delete', table: 'shopping_items', id })
   }
 
   const todo = items.filter((x) => !x.checked), bought = items.filter((x) => x.checked)

@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { Apple, ChefHat, Settings as Cog, ShoppingCart, Users } from 'lucide-react'
 import { configured, supabase } from '@/lib/supabase'
 import { AppProvider, useApp } from '@/lib/session'
-import { flush } from '@/lib/outbox'
+import { flush, onOutboxChange, pendingCount } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
 import { currentSubscription } from '@/lib/push'
 import Auth, { NewPassword } from '@/pages/Auth'
@@ -41,7 +41,15 @@ async function notifyExpiring(spaceId: string) {
 function Shell() {
   const { session, ready, space, recovery, clearRecovery } = useApp()
   useEffect(() => { if (space) void notifyExpiring(space.id) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [pending, setPending] = useState(pendingCount())
   useEffect(() => { void flush() }, [session])
+  useEffect(() => {
+    const upd = () => setPending(pendingCount())
+    const retry = () => void flush()
+    window.addEventListener('online', retry); window.addEventListener('focus', retry)
+    const off = onOutboxChange(upd)
+    return () => { window.removeEventListener('online', retry); window.removeEventListener('focus', retry); off() }
+  }, [])
 
   if (!configured) return <div className="p-6 text-sm">Не настроены переменные окружения <code>VITE_SUPABASE_URL</code> и <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>. См. README.</div>
   if (!ready) return null
@@ -50,6 +58,11 @@ function Shell() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-xl flex-col">
+      {pending > 0 && (
+        <button onClick={() => void flush()} className="mx-4 mt-3 rounded-lg bg-orange-100 px-3 py-2 text-left text-xs text-orange-900">
+          Ожидает отправки: {pending}. {navigator.onLine ? 'Нажмите, чтобы отправить сейчас.' : 'Нет связи: отправится автоматически, когда появится интернет.'}
+        </button>
+      )}
       <main className="flex-1 p-4 pb-24">
         <Routes>
           <Route path="/" element={<Products />} />

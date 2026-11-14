@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { compressImage } from '@/lib/image'
-import { enqueue, flush, isOffline } from '@/lib/outbox'
+import { flush, isOffline, run } from '@/lib/outbox'
 import { cn, daysLeft } from '@/lib/utils'
 import { ExpiryField } from '@/components/ExpiryField'
 import { BarcodeScanner } from '@/components/BarcodeScanner'
@@ -43,6 +43,11 @@ export default function Products() {
   const [adding, setAdding] = useState(false)
   const [exp, setExp] = useState(emptyExpiry())
   const [nm, setNm] = useState('')
+  const [unitV, setUnitV] = useState('шт')
+  const [locV, setLocV] = useState('')
+  const [hist, setHist] = useState<Record<string, { name: string; unit: string; location: string | null; days: number | null }>>({})
+  const [autofilled, setAutofilled] = useState(false)
+  const [histFor, setHistFor] = useState<string | null>(null)
   const [bc, setBc] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
   const [bcMsg, setBcMsg] = useState<string | null>(null)
@@ -84,6 +89,28 @@ export default function Products() {
     return () => window.removeEventListener('online', on)
   })
 
+  // История названий для подсказок: один лёгкий запрос при открытии формы
+  useEffect(() => {
+    if (!adding || !space || isOffline() || histFor === space.id) return
+    setHistFor(space.id)
+    void supabase.from('products').select('name,unit,location,shelf_life_days').eq('space_id', space.id)
+      .order('created_at', { ascending: false }).limit(300).then(({ data }) => {
+        const m: typeof hist = {}
+        for (const r of data ?? []) { const k = r.name.trim().toLowerCase(); if (!m[k]) m[k] = { name: r.name, unit: r.unit, location: r.location, days: r.shelf_life_days } }
+        setHist(m)
+      })
+  }, [adding, space, histFor])
+
+  function onName(v: string) {
+    setNm(v)
+    const h = hist[v.trim().toLowerCase()]
+    if (h && !bc) {
+      setUnitV(h.unit); setLocV(h.location ?? '')
+      if (h.days && !exp.amount) setExp((e) => ({ ...e, mode: 'life', amount: String(h.days), unit: 'days' }))
+      setAutofilled(true)
+    } else setAutofilled(false)
+  }
+
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t) }, [toast])
 
   // Переход из списка покупок: «Купил → в продукты» открывает форму с названием, остаётся указать срок
@@ -96,8 +123,8 @@ export default function Products() {
 
   async function setStatus(p: Product, status: 'consumed' | 'discarded') {
     setItems((l) => l.filter((x) => x.id !== p.id))
-    if (isOffline()) enqueue({ t: 'update', table: 'products', id: p.id, patch: { status } })
-    else await supabase.from('products').update({ status }).eq('id', p.id)
+    const r = await run({ t: 'update', table: 'products', id: p.id, patch: { status } })
+    if (!r.ok) { setItems((l) => [p, ...l]); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
     if (!space || !session) return
     const shop = () => addToShopping(space.id, session.user.id, { name: p.name, unit: p.unit })
     if (status === 'consumed' && autoShopEnabled()) {
@@ -128,14 +155,12 @@ export default function Products() {
       const up = await supabase.storage.from('foodsave-photos').upload(path, blob, { contentType: blob.type })
       if (!up.error) row.photo_path = path
     }
-    if (isOffline()) { enqueue({ t: 'insert', table: 'products', row }); setItems((l) => [row as unknown as Product, ...l]) }
-    else { await supabase.from('products').insert(row); await load(0) }
-    if (fromShop) {
-      if (isOffline()) enqueue({ t: 'delete', table: 'shopping_items', id: fromShop })
-      else await supabase.from('shopping_items').delete().eq('id', fromShop)
-      setFromShop(null)
-    }
-    setAdding(false); setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null)
+    const r = await run({ t: 'insert', table: 'products', row })
+    if (!r.ok) { setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
+    if (r.queued) { setItems((l) => [row as unknown as Product, ...l]); setToast({ text: 'Нет связи: сохранено на устройстве, отправится позже' }) }
+    else await load(0)
+    if (fromShop) { await run({ t: 'delete', table: 'shopping_items', id: fromShop }); setFromShop(null) }
+    setAdding(false); setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null); setUnitV('шт'); setLocV(''); setAutofilled(false)
   }
 
   async function onBarcode(code: string) {
@@ -157,9 +182,10 @@ export default function Products() {
       location: String(f.get('location') || '') || null,
       ...expiryFields(editExp),
     }
+    const before = items
     setItems((l) => l.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
-    if (isOffline()) enqueue({ t: 'update', table: 'products', id: editing.id, patch })
-    else await supabase.from('products').update(patch).eq('id', editing.id)
+    const r = await run({ t: 'update', table: 'products', id: editing.id, patch })
+    if (!r.ok) { setItems(before); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
     setEditing(null)
   }
 
@@ -202,14 +228,16 @@ export default function Products() {
             <div className="col-span-2">
               <Label>Название</Label>
               <div className="flex gap-2">
-                <Input name="name" required maxLength={120} autoFocus value={nm} onChange={(e) => setNm(e.target.value)} />
+                <Input name="name" required maxLength={120} autoFocus list="fs-names" autoComplete="off" value={nm} onChange={(e) => onName(e.target.value)} />
+                <datalist id="fs-names">{Object.values(hist).slice(0, 100).map((h) => <option key={h.name} value={h.name} />)}</datalist>
                 <Button type="button" variant="outline" size="icon" title="Сканировать штрихкод" onClick={() => setScanning(true)}><Barcode size={18} /></Button>
               </div>
+              {autofilled && <p className="mt-1 text-xs text-green-800">Подставлено из прошлых покупок: единица, место, срок в днях. Укажите дату производства.</p>}
               {bc && <p className="mt-1 text-xs text-green-900/70">Штрихкод {bc}{bcMsg ? ` · ${bcMsg}` : ''} <button type="button" className="underline" onClick={() => { setBc(null); setBcMsg(null) }}>убрать</button></p>}
             </div>
             <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
-            <div><Label>Единица</Label><Input name="unit" defaultValue="шт" /></div>
-            <div className="col-span-2"><Label>Место</Label><Input name="location" placeholder="холодильник" /></div>
+            <div><Label>Единица</Label><Input name="unit" value={unitV} onChange={(e) => setUnitV(e.target.value)} /></div>
+            <div className="col-span-2"><Label>Место</Label><Input name="location" placeholder="холодильник" value={locV} onChange={(e) => setLocV(e.target.value)} /></div>
             <div className="col-span-2"><ExpiryField value={exp} onChange={setExp} /></div>
             <div className="col-span-2">
               <Label>Фото (сжимается перед загрузкой)</Label>
