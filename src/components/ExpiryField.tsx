@@ -2,9 +2,9 @@ import { cn } from '@/lib/utils'
 import { Input, Label } from '@/components/ui/input'
 import { UNIT_LABEL, computeExpiry, fmt, todayIso, type ExpiryState, type Unit } from '@/lib/expiry'
 
-type Props = { value: ExpiryState; onChange: (v: ExpiryState) => void }
+type Props = { value: ExpiryState; onChange: (v: ExpiryState) => void; hintDays?: number | null }
 
-export function ExpiryField({ value: v, onChange }: Props) {
+export function ExpiryField({ value: v, onChange, hintDays }: Props) {
   const set = (p: Partial<ExpiryState>) => onChange({ ...v, ...p })
   const result = computeExpiry(v)
   const seg = (active: boolean) => cn('h-9 flex-1 rounded-lg border text-sm font-medium transition-colors',
@@ -23,6 +23,11 @@ export function ExpiryField({ value: v, onChange }: Props) {
         <button type="button" className={seg(v.mode === 'life')} onClick={() => set({ mode: 'life' })}>Годен N дней</button>
         <button type="button" className={seg(v.mode === 'until')} onClick={() => set({ mode: 'until' })}>Годен до даты</button>
       </div>
+      {hintDays && v.mode === 'life' && !v.amount && (
+        <button type="button" onClick={() => set({ amount: String(hintDays), unit: 'days' })} className="fs-pop flex w-full items-center justify-between rounded-lg bg-brand-soft px-3 py-2 text-left text-xs text-green-900">
+          <span>Обычно хранится ≈ {hintDays} дн. (ориентир, смотрите упаковку)</span><span className="font-semibold text-brand">Подставить</span>
+        </button>
+      )}
       {v.mode === 'life' ? (
         <div className="flex gap-2">
           <Input type="number" inputMode="numeric" min={1} placeholder="5" value={v.amount} onChange={(e) => set({ amount: e.target.value })} />

@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card } from '@/components/ui/card'
 import { SwipeRow } from '@/components/SwipeRow'
+import { typicalDays } from '@/lib/shelf'
 import { foodEmoji } from '@/lib/emoji'
 
 const PAGE = 30
@@ -249,7 +250,7 @@ export default function Products() {
             <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
             <div><Label>Единица</Label><Input name="unit" value={unitV} onChange={(e) => setUnitV(e.target.value)} /></div>
             <div className="col-span-2"><Label>Место</Label><Input name="location" placeholder="холодильник" value={locV} onChange={(e) => setLocV(e.target.value)} /></div>
-            <div className="col-span-2"><ExpiryField value={exp} onChange={setExp} /></div>
+            <div className="col-span-2"><ExpiryField value={exp} onChange={setExp} hintDays={typicalDays(nm)} /></div>
             <div className="col-span-2">
               <Label>Фото (сжимается перед загрузкой)</Label>
               <Input name="photo" type="file" accept="image/*" capture="environment" className="h-auto py-2" />

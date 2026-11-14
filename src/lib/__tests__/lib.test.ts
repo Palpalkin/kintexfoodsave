@@ -60,3 +60,13 @@ describe('csv export', () => {
     expect(c).toBe('﻿a;b\r\n"x;y";"say ""hi"""')
   })
 })
+
+import { typicalDays } from '../shelf'
+describe('typical shelf life', () => {
+  it('suggests by name', () => {
+    expect(typicalDays('Молоко 3,2%')).toBe(5)
+    expect(typicalDays('Сыр Российский')).toBe(14)
+    expect(typicalDays('Неизвестная штука')).toBeNull()
+    expect(typicalDays('ят')).toBeNull()
+  })
+})
