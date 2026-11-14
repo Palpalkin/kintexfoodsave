@@ -16,6 +16,7 @@ import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card } from '@/components/ui/card'
+import { SwipeRow } from '@/components/SwipeRow'
 import { foodEmoji } from '@/lib/emoji'
 
 const PAGE = 30
@@ -295,7 +296,7 @@ export default function Products() {
           </form>
         </Card>
       ) : (
-        <Card key={p.id} style={{ animationDelay: `${Math.min(idx, 10) * 45}ms` }} className={cn("fs-rise flex items-start gap-3 border-l-4 p-3", edgeTone(p.expires_on))}>
+        <SwipeRow key={p.id} onRight={() => setStatus(p, 'consumed')} onLeft={() => setStatus(p, 'discarded')} style={{ animationDelay: `${Math.min(idx, 10) * 45}ms` }} className="fs-rise"><Card className={cn("flex items-start gap-3 border-l-4 p-3", edgeTone(p.expires_on))}>
           {p.photo_path && thumbs[p.photo_path]
             ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
             : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl">{foodEmoji(p.name)}</div>}
@@ -311,8 +312,9 @@ export default function Products() {
             <Button variant="ghost" size="icon" title="Использовано" onClick={() => setStatus(p, 'consumed')}><Check size={18} className="text-brand" /></Button>
             <Button variant="ghost" size="icon" title="Выброшено" onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className="text-red-600" /></Button>
           </div>
-        </Card>
+        </Card></SwipeRow>
       ))}
+      {shown.length > 0 && <p className="pt-1 text-center text-xs text-green-900/50">Свайп вправо — использовано, влево — выброшено</p>}
       {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>Показать ещё</Button>}
 
       {toast && (
