@@ -5,6 +5,7 @@ import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { matches, parseIngredients } from '@/lib/match'
 import { daysLeft } from '@/lib/utils'
+import { loadFavs } from '@/lib/favorites'
 import { pickRecipes } from '@/lib/recipePick'
 import { addToShopping } from '@/lib/shopping'
 import type { Recipe } from '@/lib/types'
@@ -25,7 +26,9 @@ export default function Recipes() {
   const [adding, setAdding] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
-  const book = useMemo(() => pickRecipes(stock), [stock])
+  const [likes, setLikes] = useState<string[]>([])
+  useEffect(() => { if (space) void loadFavs(space.id).then((f) => setLikes(f.map((x) => x.name))) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const book = useMemo(() => pickRecipes(stock, likes), [stock, likes])
 
   async function load() {
     if (!space) return

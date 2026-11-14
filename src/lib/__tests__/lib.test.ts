@@ -105,3 +105,12 @@ describe('stats summary', () => {
   })
   it('null streak when nothing thrown', () => { expect(summarize([], now).streak).toBeNull() })
 })
+
+describe('rice dishes', () => {
+  it('finds fried rice with shrimp and corn, boosts liked rice', () => {
+    const stock = [{ name: 'Рис круглозерный', expires_on: null }, { name: 'Креветки', expires_on: null }, { name: 'Кукуруза консервированная', expires_on: null }, { name: 'Яйца', expires_on: null }, { name: 'Соус соевый', expires_on: null }, { name: 'Чеснок', expires_on: null }]
+    const picks = pickRecipes(stock, ['Рис'])
+    expect(picks[0].r.id).toBe('fried-rice-shrimp')
+    expect(picks[0].missing).toEqual(['зелёный лук'])
+  })
+})

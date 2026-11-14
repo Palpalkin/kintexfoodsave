@@ -9,7 +9,7 @@ const isStaple = (n: string) => STAPLES.some((s) => n.toLowerCase() === s)
 const alts = (n: string) => n.split('|').map((x) => x.trim())
 
 /** Что можно приготовить из продуктов в наличии. Приоритет: больше совпадений и спасение скоро портящегося. */
-export function pickRecipes(stock: Stock[], book: BookRecipe[] = BOOK): Pick[] {
+export function pickRecipes(stock: Stock[], likes: string[] = [], book: BookRecipe[] = BOOK): Pick[] {
   return book.map((r) => {
     const have: string[] = [], missing: string[] = [], saves: Pick['saves'] = []
     for (const ing of r.ing) {
@@ -24,6 +24,7 @@ export function pickRecipes(stock: Stock[], book: BookRecipe[] = BOOK): Pick[] {
     }
     const total = have.length + missing.length || 1
     const coverage = have.length / total
-    return { r, have, missing, saves, coverage, score: coverage + saves.length * 0.4 - missing.length * 0.03 }
+    const liked = likes.some((l) => r.ing.some((i) => alts(i.name).some((a) => matches(a, l)))) || likes.some((l) => matches(r.title, l))
+    return { r, have, missing, saves, coverage, score: coverage + saves.length * 0.4 - missing.length * 0.03 + (liked ? 0.25 : 0) }
   }).filter((x) => x.have.length > 0 && (x.coverage >= 0.5 || x.saves.length > 0)).sort((a, b) => b.score - a.score)
 }
