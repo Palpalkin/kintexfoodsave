@@ -70,3 +70,20 @@ describe('typical shelf life', () => {
     expect(typicalDays('ят')).toBeNull()
   })
 })
+
+import { pickRecipes } from '../recipePick'
+describe('recipe picker', () => {
+  const soon = new Date(Date.now() + 86400e3).toISOString().slice(0, 10)
+  it('finds full-coverage recipes and flags rescue of expiring items', () => {
+    const picks = pickRecipes([{ name: 'Яйца С1', expires_on: null }, { name: 'Молоко 3,2%', expires_on: soon }, { name: 'Масло сливочное', expires_on: null }])
+    const om = picks.find((p) => p.r.id === 'omelet')
+    expect(om?.missing).toEqual([])
+    expect(om?.saves.length).toBe(1)
+    expect(picks[0].r.id).toBe('omelet')
+  })
+  it('matches synonyms (куриное филе for курица)', () => {
+    const picks = pickRecipes([{ name: 'Куриное филе', expires_on: null }, { name: 'Рис', expires_on: null }, { name: 'Лук', expires_on: null }, { name: 'Морковь', expires_on: null }])
+    expect(picks.find((p) => p.r.id === 'chicken-rice')?.missing).toEqual([])
+  })
+  it('returns nothing for empty stock', () => { expect(pickRecipes([])).toEqual([]) })
+})

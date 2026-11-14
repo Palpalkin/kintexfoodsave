@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Sparkles, Trash2, X } from 'lucide-react'
+import { ChevronDown, Clock, Plus, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { matches, parseIngredients } from '@/lib/match'
 import { daysLeft } from '@/lib/utils'
+import { pickRecipes } from '@/lib/recipePick'
+import { addToShopping } from '@/lib/shopping'
 import type { Recipe } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
@@ -21,6 +23,9 @@ export default function Recipes() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const book = useMemo(() => pickRecipes(stock), [stock])
 
   async function load() {
     if (!space) return
@@ -73,6 +78,13 @@ export default function Recipes() {
     setDraft((x) => x.filter((r) => r !== d)); await load()
   }
 
+  async function buyMissing(missing: string[]) {
+    if (!space || !session) return
+    let n = 0
+    for (const m of missing) if ((await addToShopping(space.id, session.user.id, { name: m })) === 'added') n++
+    setNote(n ? `В список покупок добавлено: ${n}` : 'Всё это уже есть в списке покупок'); setTimeout(() => setNote(null), 3000)
+  }
+
   async function addManual(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const f = new FormData(e.currentTarget)
@@ -123,9 +135,44 @@ export default function Recipes() {
       {err && <Card className="border-orange-200 bg-orange-50 text-sm text-orange-900">{err}</Card>}
       {draft.map((r, i) => view(r, <Button size="sm" variant="outline" onClick={() => save(r, 'ai')}>Сохранить</Button>, 'd' + i))}
 
+      {stock.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold text-green-900/80">Что приготовить из ваших продуктов</h3>
+          {note && <p className="fs-pop rounded-lg bg-brand-soft px-3 py-2 text-xs">{note}</p>}
+          {book.length === 0 && <p className="text-sm text-green-900/60">Пока не нашли подходящих блюд. Добавьте больше продуктов (яйца, молоко, картофель, крупы, мясо, овощи) — подборка появится сама.</p>}
+          {book.slice(0, 12).map(({ r, have, missing, saves }) => (
+            <Card key={r.id} className="fs-rise space-y-2 p-3">
+              <button className="flex w-full items-start gap-3 text-left" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-2xl">{r.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold leading-tight">{r.title}</span>
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <Badge className={missing.length ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>{missing.length ? `не хватает: ${missing.length}` : 'всё есть'}</Badge>
+                    {saves.slice(0, 2).map((x) => <Badge key={x.name} className="bg-orange-100 text-orange-800">спасёт: {x.name}</Badge>)}
+                    <span className="flex items-center gap-0.5 text-xs text-green-900/60"><Clock size={12} />{r.minutes} мин</span>
+                  </span>
+                </span>
+                <ChevronDown size={18} className={`mt-1 shrink-0 transition-transform ${openId === r.id ? 'rotate-180' : ''}`} />
+              </button>
+              {openId === r.id && (
+                <div className="fs-fade space-y-2 text-sm">
+                  <p className="text-xs"><span className="font-medium">Есть:</span> {have.join(', ')}.{missing.length > 0 && <> <span className="font-medium text-orange-800">Нужно докупить:</span> {missing.join(', ')}.</>}</p>
+                  <p className="text-xs text-green-900/70">{r.ing.map((i) => i.name.split('|')[0] + (i.amount ? ` — ${i.amount}` : '')).join(' · ')}</p>
+                  <p>{r.steps}</p>
+                  <div className="flex gap-2">
+                    {missing.length > 0 && <Button size="sm" variant="outline" onClick={() => buyMissing(missing)}><ShoppingCart size={14} />В покупки</Button>}
+                    <Button size="sm" variant="outline" onClick={() => save({ title: r.title, ingredients: r.ing.map((i) => ({ name: i.name.split('|')[0], amount: i.amount })), instructions: r.steps }, 'manual')}>Сохранить себе</Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))}
+        </section>
+      )}
+
       {ranked.length > 0 && (
         <>
-          <h3 className="pt-1 text-sm font-semibold text-green-900/80">Можно приготовить из ваших продуктов</h3>
+          <h3 className="pt-1 text-sm font-semibold text-green-900/80">Ваши рецепты, которые подходят</h3>
           {ranked.slice(0, 5).map(({ r, have, total, saves }) => view(r, del(r.id), 'rk' + r.id, (
             <div className="flex flex-wrap gap-1.5">
               <Badge className="bg-green-100 text-green-800">есть {have} из {total}</Badge>
