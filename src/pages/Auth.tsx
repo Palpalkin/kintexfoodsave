@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '@/lib/supabase'
+import { LEGAL } from '@/lib/legal'
+import { LegalLinks } from '@/pages/Legal'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -31,13 +33,16 @@ export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [agree, setAgree] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   async function submit(e: FormEvent) {
-    e.preventDefault(); setBusy(true); setMsg(null)
+    e.preventDefault(); setMsg(null)
+    if (mode === 'up' && !agree) { setMsg('Для регистрации нужно дать согласие на обработку персональных данных.'); return }
+    setBusy(true)
     const { data, error } = mode === 'in'
       ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password })
+      : await supabase.auth.signUp({ email, password, options: { data: { consent_pd_version: LEGAL.version, consent_pd_at: new Date().toISOString(), terms_version: LEGAL.version } } })
     if (error) setMsg(error.message)
     else if (mode === 'up' && !data.session) setMsg('Проверьте почту: отправлена ссылка для подтверждения.')
     setBusy(false)
@@ -59,6 +64,12 @@ export default function Auth() {
         <form onSubmit={submit} className="space-y-3">
           <div><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></div>
           <div><Label>Пароль</Label><Input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} /></div>
+          {mode === 'up' && (
+            <label className="flex items-start gap-2 text-xs leading-snug">
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-green-700" />
+              <span>Я даю <a href="/consent" target="_blank" rel="noopener" className="text-brand underline">согласие на обработку персональных данных</a> (в том числе трансграничную передачу), ознакомлен с <a href="/privacy" target="_blank" rel="noopener" className="text-brand underline">Политикой</a> и принимаю <a href="/terms" target="_blank" rel="noopener" className="text-brand underline">Пользовательское соглашение</a>.</span>
+            </label>
+          )}
           {msg && <p className="text-sm text-red-700">{msg}</p>}
           <Button className="w-full" disabled={busy}>{mode === 'in' ? 'Войти' : 'Зарегистрироваться'}</Button>
         </form>
@@ -67,6 +78,7 @@ export default function Auth() {
           {mode === 'in' ? 'Нет аккаунта? Регистрация' : 'Уже есть аккаунт? Войти'}
         </button>
       </Card>
+      <LegalLinks />
     </div>
   )
 }

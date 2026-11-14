@@ -4,6 +4,7 @@ import { useApp } from '@/lib/session'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { LegalLinks } from '@/pages/Legal'
 import { exportData } from '@/lib/export'
 import { autoShopEnabled, setAutoShop } from '@/lib/shopping'
 import { currentSubscription, disablePush, enablePush, isIos, isStandalone, pushSupported, testPush } from '@/lib/push'
@@ -109,7 +110,20 @@ export default function Settings() {
         </Card>
       )}
       <Button variant="outline" className="w-full" onClick={() => window.dispatchEvent(new Event('fs-tour'))}>Показать приветствие</Button>
+      <Card className="space-y-2 border-red-200">
+        <h3 className="font-semibold">Удалить аккаунт</h3>
+        <p className="text-xs text-green-900/70">Безвозвратно удалит аккаунт, ваши пространства и все данные в них. Это же отзыв согласия на обработку персональных данных.</p>
+        <Button variant="outline" className="w-full text-red-600" onClick={async () => {
+          if (!confirm('Удалить аккаунт и все данные без возможности восстановления?')) return
+          if (!confirm('Точно удалить? Отменить будет нельзя.')) return
+          const { error } = await supabase.rpc('delete_my_account')
+          if (error) { setExpMsg('Не удалось удалить: ' + error.message); return }
+          try { localStorage.clear() } catch { /* */ }
+          await supabase.auth.signOut(); location.href = '/'
+        }}>Удалить аккаунт и данные</Button>
+      </Card>
       <Button variant="outline" className="w-full" onClick={() => supabase.auth.signOut()}>Выйти из аккаунта</Button>
+      <LegalLinks />
     </div>
   )
 }

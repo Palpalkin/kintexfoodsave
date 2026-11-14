@@ -13,6 +13,8 @@ import Shopping from '@/pages/Shopping'
 import Family from '@/pages/Family'
 import Settings from '@/pages/Settings'
 import Scan from '@/pages/Scan'
+import { LegalPage, LEGAL_PATHS } from '@/pages/Legal'
+import { CookieNotice } from '@/components/CookieNotice'
 import { Onboarding, onboardingSeen } from '@/components/Onboarding'
 
 const tabs = [
@@ -55,9 +57,10 @@ function Shell() {
     return () => { window.removeEventListener('online', retry); window.removeEventListener('focus', retry); off() }
   }, [])
 
+  if (LEGAL_PATHS.includes(loc.pathname)) return <><LegalPage path={loc.pathname} /><CookieNotice /></>
   if (!configured) return <div className="p-6 text-sm">Не настроены переменные окружения <code>VITE_SUPABASE_URL</code> и <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>. См. README.</div>
   if (!ready) return null
-  if (!session) return <Auth />
+  if (!session) return <><Auth /><CookieNotice /></>
   if (recovery) return <NewPassword onDone={clearRecovery} />
 
   return (
@@ -67,6 +70,7 @@ function Shell() {
           Ожидает отправки: {pending}. {navigator.onLine ? 'Нажмите, чтобы отправить сейчас.' : 'Нет связи: отправится автоматически, когда появится интернет.'}
         </button>
       )}
+      <CookieNotice />
       {tour && <Onboarding onClose={() => setTour(false)} />}
       <main key={loc.pathname} className="fs-fade flex-1 p-4 pb-24">
         <Routes>
