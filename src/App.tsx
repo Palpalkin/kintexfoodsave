@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Apple, ChefHat, Settings as Cog, ShoppingCart, Users } from 'lucide-react'
 import { configured, supabase } from '@/lib/supabase'
 import { AppProvider, useApp } from '@/lib/session'
@@ -40,6 +40,7 @@ async function notifyExpiring(spaceId: string) {
 
 function Shell() {
   const { session, ready, space, recovery, clearRecovery } = useApp()
+  const loc = useLocation()
   useEffect(() => { if (space) void notifyExpiring(space.id) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [pending, setPending] = useState(pendingCount())
   useEffect(() => { void flush() }, [session])
@@ -63,7 +64,7 @@ function Shell() {
           Ожидает отправки: {pending}. {navigator.onLine ? 'Нажмите, чтобы отправить сейчас.' : 'Нет связи: отправится автоматически, когда появится интернет.'}
         </button>
       )}
-      <main className="fs-fade flex-1 p-4 pb-24">
+      <main key={loc.pathname} className="fs-fade flex-1 p-4 pb-24">
         <Routes>
           <Route path="/" element={<Products />} />
           <Route path="/scan" element={<Scan />} />
@@ -79,7 +80,7 @@ function Shell() {
           {tabs.map(({ to, label, icon: I }) => (
             <NavLink key={to} to={to} end className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors', isActive ? 'text-brand font-semibold' : 'text-gray-500')}>
               {({ isActive }: { isActive: boolean }) => <>
-                <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-brand-soft')}><I size={20} /></span>{label}
+                <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-brand-soft')}><I size={20} className={isActive ? 'fs-pop' : ''} /></span>{label}
               </>}
             </NavLink>
           ))}

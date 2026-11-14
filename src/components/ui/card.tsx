@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import type { HTMLAttributes } from 'react'
 
 export const Card = ({ className, ...p }: HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('rounded-xl border border-green-100 bg-white p-4 shadow-sm', className)} {...p} />
+  <div className={cn('rounded-xl border border-green-100 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md', className)} {...p} />
 )
 
 export const Badge = ({ className, ...p }: HTMLAttributes<HTMLSpanElement>) => (

@@ -28,7 +28,8 @@
 
 html, body, #root { height: 100%; }
 body {
-  background: var(--color-surface);
+  background: radial-gradient(900px 420px at 85% -10%, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 70%), radial-gradient(700px 380px at -10% 0%, color-mix(in srgb, var(--color-brand) 8%, transparent), transparent 70%), var(--color-surface);
+  background-attachment: fixed;
   color: #14231a;
   font-family: var(--font-sans);
   padding-top: env(safe-area-inset-top);
@@ -42,3 +43,18 @@ button:active { transform: scale(.98); }
 
 input, select, textarea { color: inherit; }
 @media (prefers-color-scheme: dark) { body { color: #e6f4ea; } ::placeholder { color: #6b8a76; } }
+
+/* Анимации: появление карточек со сдвигом, всплывающие уведомления, мягкое «дыхание» срочных меток */
+@keyframes fs-rise { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes fs-toast { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes fs-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .45); } 50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } }
+@keyframes fs-float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-3deg); } }
+@keyframes fs-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.fs-rise { animation: fs-rise .4s cubic-bezier(.2, .8, .2, 1) both; }
+.fs-toast { animation: fs-toast .3s cubic-bezier(.2, .8, .2, 1); }
+.fs-pulse { animation: fs-pulse 2s ease-out infinite; }
+.fs-float { animation: fs-float 4s ease-in-out infinite; }
+.fs-pop { animation: fs-pop .35s ease-out; }
+button, a { transition: transform .12s ease, background-color .15s ease, box-shadow .15s ease; }
+@media (hover: hover) { button:hover:not(:disabled) { transform: translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) { .fs-rise, .fs-toast, .fs-pulse, .fs-float, .fs-pop { animation: none; } }

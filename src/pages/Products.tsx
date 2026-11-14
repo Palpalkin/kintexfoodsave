@@ -35,8 +35,8 @@ type Filter = 'all' | 'soon' | 'expired'
 function ExpiryBadge({ date }: { date: string | null }) {
   const d = daysLeft(date)
   if (d === null) return <Badge className="bg-gray-100 text-gray-600">без срока</Badge>
-  if (d < 0) return <Badge className="bg-red-100 text-red-800">просрочено {-d} дн.</Badge>
-  if (d === 0) return <Badge className="bg-red-100 text-red-800">сегодня</Badge>
+  if (d < 0) return <Badge className="fs-pulse bg-red-100 text-red-800">просрочено {-d} дн.</Badge>
+  if (d === 0) return <Badge className="fs-pulse bg-red-100 text-red-800">сегодня</Badge>
   if (d <= 3) return <Badge className="bg-orange-100 text-orange-800">{d} дн.</Badge>
   if (d <= 7) return <Badge className="bg-yellow-100 text-yellow-800">{d} дн.</Badge>
   return <Badge className="bg-green-100 text-green-800">{d} дн.</Badge>
@@ -225,7 +225,7 @@ export default function Products() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5"><img src="/icon-192.png" alt="" className="h-9 w-9 rounded-xl shadow-sm" /><h2 className="text-xl font-bold tracking-tight">Продукты</h2></div>
+        <div className="flex items-center gap-2.5"><img src="/icon-192.png" alt="" className="fs-float h-9 w-9 rounded-xl shadow-sm" /><h2 className="text-xl font-bold tracking-tight">Продукты</h2></div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />Чек</Link></Button>
           <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Добавить'}</Button>
@@ -282,7 +282,7 @@ export default function Products() {
       )}
       {items.length > 0 && !shown.length && <p className="py-6 text-center text-sm text-green-900/60">Ничего не найдено.</p>}
 
-      {shown.map((p) => editing?.id === p.id ? (
+      {shown.map((p, idx) => editing?.id === p.id ? (
         <Card key={p.id}>
           <form onSubmit={saveEdit} className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Название</Label><Input name="name" required maxLength={120} defaultValue={p.name} /></div>
@@ -295,7 +295,7 @@ export default function Products() {
           </form>
         </Card>
       ) : (
-        <Card key={p.id} className={cn("flex items-start gap-3 border-l-4 p-3", edgeTone(p.expires_on))}>
+        <Card key={p.id} style={{ animationDelay: `${Math.min(idx, 10) * 45}ms` }} className={cn("fs-rise flex items-start gap-3 border-l-4 p-3", edgeTone(p.expires_on))}>
           {p.photo_path && thumbs[p.photo_path]
             ? <img src={thumbs[p.photo_path]} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
             : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-2xl">{foodEmoji(p.name)}</div>}
@@ -316,7 +316,7 @@ export default function Products() {
       {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>Показать ещё</Button>}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-green-950 px-4 py-3 text-sm text-[#ffffff] shadow-lg">
+        <div className="fs-toast fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-green-950 px-4 py-3 text-sm text-[#ffffff] shadow-lg">
           <span>{toast.text}</span>
           {toast.action && <button className="shrink-0 font-semibold text-green-300 underline" onClick={toast.action.run}>{toast.action.label}</button>}
         </div>
