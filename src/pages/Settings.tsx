@@ -4,6 +4,7 @@ import { useApp } from '@/lib/session'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { Link } from 'react-router-dom'
 import { LegalLinks } from '@/pages/Legal'
 import { exportData } from '@/lib/export'
 import { autoShopEnabled, setAutoShop } from '@/lib/shopping'
@@ -90,6 +91,7 @@ export default function Settings() {
           <p className="text-xs text-green-900/60">Раз в день в 09:00 (Москва) приходит сводка: что просрочено и что скоро испортится. Порог задаётся выше.</p>
         </div>
       </Card>
+      <Link to="/stats" className="block rounded-xl border border-green-200 bg-white px-4 py-3 text-sm font-medium text-brand shadow-sm">📊 Подробная статистика по месяцам →</Link>
       {spent && spent.month > 0 && (
         <Card className="space-y-1">
           <p className="text-xs font-medium text-green-900/60">Траты по чекам в этом месяце</p>

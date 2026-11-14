@@ -13,6 +13,7 @@ import Shopping from '@/pages/Shopping'
 import Family from '@/pages/Family'
 import Settings from '@/pages/Settings'
 import Scan from '@/pages/Scan'
+import Stats from '@/pages/Stats'
 import { LegalPage, LEGAL_PATHS } from '@/pages/Legal'
 import { CookieNotice } from '@/components/CookieNotice'
 import { Onboarding, onboardingSeen } from '@/components/Onboarding'
@@ -80,6 +81,7 @@ function Shell() {
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/family" element={<Family />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/stats" element={<Stats />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

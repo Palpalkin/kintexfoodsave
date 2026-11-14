@@ -87,3 +87,21 @@ describe('recipe picker', () => {
   })
   it('returns nothing for empty stock', () => { expect(pickRecipes([])).toEqual([]) })
 })
+
+import { summarize } from '../stats'
+describe('stats summary', () => {
+  const now = new Date(2026, 10, 14)
+  it('buckets by month, counts waste, streak and top', () => {
+    const r = summarize([
+      { name: 'Молоко', status: 'discarded', price: 90, updated_at: new Date(2026, 10, 10).toISOString() },
+      { name: 'молоко', status: 'discarded', price: 90, updated_at: new Date(2026, 9, 2).toISOString() },
+      { name: 'Хлеб', status: 'consumed', price: null, updated_at: new Date(2026, 10, 12).toISOString() },
+    ], now)
+    const nov = r.months[r.months.length - 1]
+    expect(nov).toMatchObject({ eaten: 1, thrown: 1, lost: 90 })
+    expect(r.top[0]).toEqual({ name: 'молоко', n: 2 })
+    expect(r.streak).toBe(4)
+    expect(r.months).toHaveLength(6)
+  })
+  it('null streak when nothing thrown', () => { expect(summarize([], now).streak).toBeNull() })
+})
