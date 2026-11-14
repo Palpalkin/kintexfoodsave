@@ -11,7 +11,7 @@ import { ExpiryField } from '@/components/ExpiryField'
 import { BarcodeScanner } from '@/components/BarcodeScanner'
 import { lookupBarcode } from '@/lib/barcode'
 import { addToShopping, autoShopEnabled } from '@/lib/shopping'
-import { emptyExpiry, expiryFields, fmt, type ExpiryState } from '@/lib/expiry'
+import { addPeriod, computeExpiry, emptyExpiry, expiryFields, fmt, todayIso, type ExpiryState } from '@/lib/expiry'
 import type { Product } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
@@ -36,7 +36,7 @@ function edgeTone(date: string | null) {
   return 'border-l-green-500'
 }
 
-type Filter = 'all' | 'soon' | 'expired'
+type Filter = 'all' | 'soon' | 'expired' | 'fav'
 
 function ExpiryBadge({ date }: { date: string | null }) {
   const d = daysLeft(date)
@@ -75,6 +75,9 @@ export default function Products() {
   const nav = useNavigate()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [locF, setLocF] = useState<string | null>(null)
+  const [openDays, setOpenDays] = useState('3')
+  const [openedOn, setOpenedOn] = useState<string | null>(null)
   const [editing, setEditing] = useState<Product | null>(null)
   const [editExp, setEditExp] = useState(emptyExpiry())
 
@@ -215,7 +218,16 @@ export default function Products() {
     else setBcMsg('Название не найдено: введите его, я запомню его для этого штрихкода')
   }
 
-  function startEdit(p: Product) { setEditing(p); setEditExp(toExpiryState(p)) }
+  function startEdit(p: Product) { setEditing(p); setEditExp(toExpiryState(p)); setOpenedOn(null) }
+
+  // «Вскрыл сегодня»: после вскрытия продукт хранится меньше — срок становится ближайшим из прежнего и «сегодня + N дней».
+  function markOpened() {
+    const n = Math.max(1, Math.min(365, Number(openDays) || 1))
+    const limit = addPeriod(todayIso(), n, 'days')
+    const cur = computeExpiry(editExp)
+    setEditExp({ ...editExp, mode: 'until', until: cur && cur < limit ? cur : limit })
+    setOpenedOn(todayIso())
+  }
 
   async function saveEdit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -226,6 +238,7 @@ export default function Products() {
       quantity: Number(f.get('quantity') || 0), unit: String(f.get('unit') || 'шт'),
       location: String(f.get('location') || '') || null,
       ...expiryFields(editExp),
+      ...(openedOn ? { opened_on: openedOn } : {}),
     }
     const before = items
     setItems((l) => l.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
@@ -243,13 +256,17 @@ export default function Products() {
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return items.filter((p) => {
+      if (locF && (p.location ?? '').trim().toLowerCase() !== locF) return false
+      if (filter === 'fav' && !favs.has(favKey(p.name))) return false
       if (needle && !(p.name + ' ' + (p.location ?? '')).toLowerCase().includes(needle)) return false
       const d = daysLeft(p.expires_on)
       if (filter === 'expired') return d !== null && d < 0
       if (filter === 'soon') return d !== null && d >= 0 && d <= 3
       return true
     })
-  }, [items, q, filter])
+  }, [items, q, filter, locF, favs])
+
+  const locations = useMemo(() => [...new Set(items.map((p) => (p.location ?? '').trim().toLowerCase()).filter(Boolean))].slice(0, 8), [items])
 
   const chip = (f: Filter, label: string, n?: number, tone = '') => (
     <button key={f} onClick={() => setFilter(f)} className={cn('h-8 rounded-full border px-3 text-xs font-medium', filter === f ? 'border-brand bg-brand-solid text-[#ffffff]' : 'border-green-200 bg-white ' + tone)}>
@@ -305,7 +322,15 @@ export default function Products() {
             {chip('all', 'Все')}
             {chip('soon', 'Скоро (≤3 дн.)', stats.soon)}
             {chip('expired', 'Просрочено', stats.expired, stats.expired ? 'text-red-700' : '')}
+            {favs.size > 0 && chip('fav', '★ Любимые')}
           </div>
+          {locations.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto">
+              {locations.map((l) => (
+                <button key={l} onClick={() => setLocF(locF === l ? null : l)} className={cn('h-7 shrink-0 rounded-full border px-3 text-xs capitalize', locF === l ? 'border-brand bg-brand-soft font-medium' : 'border-green-100 bg-white text-green-900/70')}>{l}</button>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -325,6 +350,13 @@ export default function Products() {
             <div><Label>Единица</Label><Input name="unit" defaultValue={p.unit} /></div>
             <div className="col-span-2"><Label>Место</Label><Input name="location" defaultValue={p.location ?? ''} placeholder="холодильник" /></div>
             <div className="col-span-2"><ExpiryField value={editExp} onChange={setEditExp} /></div>
+            <div className="col-span-2 flex items-center gap-2 rounded-lg bg-brand-soft p-2 text-xs">
+              <span className="shrink-0">После вскрытия годен</span>
+              <input type="number" min={1} max={365} value={openDays} onChange={(e) => setOpenDays(e.target.value)} className="h-8 w-14 rounded-md border border-green-200 bg-white px-2 text-center text-sm" aria-label="Дней после вскрытия" />
+              <span className="shrink-0">дн.</span>
+              <button type="button" onClick={markOpened} className="ml-auto h-8 shrink-0 rounded-md bg-brand-solid px-3 font-medium text-[#ffffff]">Вскрыл сегодня</button>
+            </div>
+            {openedOn && <p className="col-span-2 text-xs text-green-900/70">Срок пересчитан. Нажмите «Сохранить».</p>}
             <Button type="button" variant="outline" onClick={() => setEditing(null)}>Отмена</Button>
             <Button>Сохранить</Button>
           </form>
