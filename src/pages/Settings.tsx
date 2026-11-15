@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Link } from 'react-router-dom'
+import { InstallCard } from '@/components/InstallCard'
 import { LegalLinks } from '@/pages/Legal'
 import { exportData } from '@/lib/export'
 import { autoShopEnabled, setAutoShop } from '@/lib/shopping'
@@ -58,6 +59,7 @@ export default function Settings() {
   return (
     <div className="space-y-3">
       <h2 className="text-lg font-semibold">Настройки</h2>
+      <InstallCard />
       {stat && (
         <Card className="space-y-1">
           <p className="text-xs font-medium text-green-900/60">За 30 дней{space ? ` · ${space.name}` : ''}</p>
