@@ -121,3 +121,14 @@ describe('strict ingredient match', () => {
     expect(picks.find((p) => p.r.id === 'rice-egg-onion')?.missing).toContain('соевый соус')
   })
 })
+
+import { partStep } from '../utils'
+describe('part step', () => {
+  it('uses sensible steps per unit', () => {
+    expect(partStep('шт', 6)).toBe(1)
+    expect(partStep('г', 500)).toBe(100)
+    expect(partStep('мл', 200)).toBe(50)
+    expect(partStep('кг', 2)).toBe(0.5)
+    expect(partStep('л', 1)).toBe(0.25)
+  })
+})

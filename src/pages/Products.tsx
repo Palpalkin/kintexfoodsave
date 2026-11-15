@@ -6,7 +6,7 @@ import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { compressImage } from '@/lib/image'
 import { flush, isOffline, run } from '@/lib/outbox'
-import { cn, daysLeft } from '@/lib/utils'
+import { cn, daysLeft, partStep } from '@/lib/utils'
 import { ExpiryField } from '@/components/ExpiryField'
 import { BarcodeScanner } from '@/components/BarcodeScanner'
 import { lookupBarcode } from '@/lib/barcode'
@@ -122,6 +122,17 @@ export default function Products() {
     })()
     return () => { off = true }
   }, [items])
+
+  // «Использовал часть»: уменьшает количество на шаг; когда ничего не осталось — продукт считается использованным.
+  async function usePart(p: Product) {
+    const left = Math.round((p.quantity - partStep(p.unit, p.quantity)) * 1000) / 1000
+    if (left <= 0) { void setStatus(p, 'consumed'); return }
+    const before = items
+    setItems((l) => l.map((x) => (x.id === p.id ? { ...x, quantity: left } : x)))
+    const r = await run({ t: 'update', table: 'products', id: p.id, patch: { quantity: left } })
+    if (!r.ok) { setItems(before); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
+    setToast({ text: `«${p.name}»: осталось ${left} ${p.unit}`, action: { label: 'Отменить', run: () => { setItems((l) => l.map((x) => (x.id === p.id ? { ...x, quantity: p.quantity } : x))); void run({ t: 'update', table: 'products', id: p.id, patch: { quantity: p.quantity } }); setToast(null) } } })
+  }
 
   async function star(p: Product) {
     if (!space || !session) return
@@ -374,7 +385,7 @@ export default function Products() {
               <button type="button" aria-label="Любимый" aria-pressed={favs.has(favKey(p.name))} onClick={() => void star(p)} className="shrink-0 p-0.5"><Star size={16} className={favs.has(favKey(p.name)) ? 'fill-yellow-400 text-yellow-500' : 'text-green-900/30'} /></button>
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">
-              <span>{p.quantity} {p.unit}</span>{p.brand && <span>· {p.brand}</span>}{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
+              <span className="inline-flex items-center gap-1">{p.quantity} {p.unit}<button type="button" onClick={() => void usePart(p)} aria-label="Использовал часть" title="Использовал часть" className="flex h-5 w-5 items-center justify-center rounded-full border border-green-200 bg-white text-xs font-bold leading-none text-green-900/70">−</button></span>{p.brand && <span>· {p.brand}</span>}{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
             </div>
             <div className="mt-1.5"><ExpiryBadge date={p.expires_on} /></div>
           </div>
