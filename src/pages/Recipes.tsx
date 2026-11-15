@@ -6,6 +6,7 @@ import { cacheGet, cacheSet } from '@/lib/cache'
 import { matches, parseIngredients } from '@/lib/match'
 import { daysLeft } from '@/lib/utils'
 import { loadFavs } from '@/lib/favorites'
+import { MEAL_LABEL, type Meal } from '@/lib/recipeBook'
 import { pickRecipes } from '@/lib/recipePick'
 import { addToShopping } from '@/lib/shopping'
 import type { Recipe } from '@/lib/types'
@@ -26,6 +27,7 @@ export default function Recipes() {
   const [adding, setAdding] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [meal, setMeal] = useState<Meal | null>(null)
   const [likes, setLikes] = useState<string[]>([])
   useEffect(() => { if (space) void loadFavs(space.id).then((f) => setLikes(f.map((x) => x.name))) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const book = useMemo(() => pickRecipes(stock, likes), [stock, likes])
@@ -141,9 +143,14 @@ export default function Recipes() {
       {stock.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-sm font-semibold text-green-900/80">Что приготовить из ваших продуктов</h3>
+          <div className="flex gap-2 overflow-x-auto">
+            {(Object.keys(MEAL_LABEL) as Meal[]).map((m) => (
+              <button key={m} onClick={() => setMeal(meal === m ? null : m)} className={`h-8 shrink-0 rounded-full border px-3 text-xs font-medium ${meal === m ? 'border-brand bg-brand-solid text-[#ffffff]' : 'border-green-200 bg-white'}`}>{MEAL_LABEL[m]}</button>
+            ))}
+          </div>
           {note && <p className="fs-pop rounded-lg bg-brand-soft px-3 py-2 text-xs">{note}</p>}
-          {book.length === 0 && <p className="text-sm text-green-900/60">Пока не нашли подходящих блюд. Добавьте больше продуктов (яйца, молоко, картофель, крупы, мясо, овощи) — подборка появится сама.</p>}
-          {book.slice(0, 12).map(({ r, have, missing, saves }) => (
+          {book.filter((b) => !meal || b.r.meals?.includes(meal)).length === 0 && <p className="text-sm text-green-900/60">Пока не нашли подходящих блюд. Добавьте больше продуктов (яйца, молоко, картофель, крупы, мясо, овощи) — подборка появится сама.</p>}
+          {book.filter((b) => !meal || b.r.meals?.includes(meal)).slice(0, 12).map(({ r, have, missing, saves }) => (
             <Card key={r.id} className="fs-rise space-y-2 p-3">
               <button className="flex w-full items-start gap-3 text-left" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-2xl">{r.icon}</span>

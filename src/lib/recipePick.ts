@@ -1,5 +1,5 @@
 import { BOOK, STAPLES, type BookRecipe } from './recipeBook'
-import { matches } from './match'
+import { matches, matchesAll } from './match'
 import { daysLeft } from './utils'
 
 export type Stock = { name: string; expires_on: string | null }
@@ -15,7 +15,7 @@ export function pickRecipes(stock: Stock[], likes: string[] = [], book: BookReci
     for (const ing of r.ing) {
       const label = alts(ing.name)[0]
       if (isStaple(label)) continue
-      const hit = stock.find((s) => alts(ing.name).some((a) => matches(a, s.name)))
+      const hit = stock.find((s) => alts(ing.name).some((a) => matchesAll(a, s.name)))
       if (hit) {
         have.push(label)
         const d = daysLeft(hit.expires_on)

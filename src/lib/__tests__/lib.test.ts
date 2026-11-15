@@ -114,3 +114,10 @@ describe('rice dishes', () => {
     expect(picks[0].missing).toEqual(['зелёный лук'])
   })
 })
+
+describe('strict ingredient match', () => {
+  it('tomato sauce does not count as soy sauce', () => {
+    const picks = pickRecipes([{ name: 'Рис', expires_on: null }, { name: 'Яйца', expires_on: null }, { name: 'Соус томатный', expires_on: null }])
+    expect(picks.find((p) => p.r.id === 'rice-egg-onion')?.missing).toContain('соевый соус')
+  })
+})
