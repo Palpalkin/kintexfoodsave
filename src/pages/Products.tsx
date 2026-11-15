@@ -55,6 +55,7 @@ export default function Products() {
   const [items, setItems] = useState<Product[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [favs, setFavs] = useState<Set<string>>(new Set())
+  const [favNames, setFavNames] = useState<string[]>([])
   const [badImg, setBadImg] = useState<Set<string>>(new Set())
   const [more, setMore] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -104,7 +105,7 @@ export default function Products() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load(0) }, [space?.id])
-  useEffect(() => { if (space) void loadFavs(space.id).then((l) => setFavs(new Set(l.map((f) => f.name_key)))) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (space) void loadFavs(space.id).then((l) => { setFavs(new Set(l.map((f) => f.name_key))); setFavNames(l.map((f) => f.name)) }) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Фото из открытой базы для продуктов без своего фото: по несколько штук за раз, результат запоминается в записи.
   useEffect(() => {
@@ -140,7 +141,10 @@ export default function Products() {
     setFavs((s) => { const n = new Set(s); if (on) n.add(k); else n.delete(k); return n })
     const err = await toggleFav(space.id, session.user.id, p.name, p.unit, on)
     if (err) { setFavs((s) => { const n = new Set(s); if (on) n.delete(k); else n.add(k); return n }); setToast({ text: 'Не удалось изменить: ' + err }) }
-    else setToast({ text: on ? `«${p.name}» — в любимых: закончится — предложим купить снова` : 'Убрано из любимых' })
+    else {
+      setFavNames((l) => (on ? [...l, p.name] : l.filter((x) => favKey(x) !== k)))
+      setToast({ text: on ? `«${p.name}» — в любимых: закончится — предложим купить снова` : 'Убрано из любимых' })
+    }
   }
   useEffect(() => {
     const on = async () => { if (await flush()) void load(0) }
@@ -305,6 +309,11 @@ export default function Products() {
                 <datalist id="fs-names">{Object.values(hist).slice(0, 100).map((h) => <option key={h.name} value={h.name} />)}</datalist>
                 <Button type="button" variant="outline" size="icon" title="Сканировать штрихкод" onClick={() => setScanning(true)}><Barcode size={18} /></Button>
               </div>
+              {!nm && favNames.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {favNames.slice(0, 12).map((n) => <button key={n} type="button" onClick={() => onName(n)} className="fs-pop rounded-full border border-green-200 bg-white px-2.5 py-1 text-xs">★ {n}</button>)}
+                </div>
+              )}
               {autofilled && <p className="mt-1 text-xs text-green-800">Подставлено из прошлых покупок: единица, место, срок в днях. Укажите дату производства.</p>}
               {bc && <p className="mt-1 text-xs text-green-900/70">Штрихкод {bc}{bcMsg ? ` · ${bcMsg}` : ''} <button type="button" className="underline" onClick={() => { setBc(null); setBcMsg(null) }}>убрать</button></p>}
             </div>
