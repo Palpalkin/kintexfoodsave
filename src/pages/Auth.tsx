@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LEGAL } from '@/lib/legal'
 import { LegalLinks } from '@/pages/Legal'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -56,6 +57,7 @@ export default function Auth() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-sm flex-col justify-center gap-6 p-4">
+      <div className="flex justify-end"><LanguageSwitch compact /></div>
       <div className="text-center">
         <img src="/logo-hero.webp" alt="KINTEX FOOD SAVE" className="mx-auto h-auto w-full max-w-[320px]" />
         <p className="mt-2 text-sm text-green-900/70">Умная система управления продуктами, сроками годности и питанием</p>

@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Link } from 'react-router-dom'
+import { useT } from '@/lib/i18n'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { InstallCard } from '@/components/InstallCard'
 import { LegalLinks } from '@/pages/Legal'
 import { exportData } from '@/lib/export'
@@ -13,6 +15,7 @@ import { currentSubscription, disablePush, enablePush, isIos, isStandalone, push
 
 export default function Settings() {
   const { session, space } = useApp()
+  const tt = useT()
   const [stat, setStat] = useState<{ eaten: number; thrown: number } | null>(null)
   const [days, setDays] = useState(3)
   const [pushOn, setPushOn] = useState(false)
@@ -59,6 +62,7 @@ export default function Settings() {
   return (
     <div className="space-y-3">
       <h2 className="text-lg font-semibold">Настройки</h2>
+      <Card className="flex items-center justify-between"><span className="font-medium">{tt('lang.label')} / Language</span><LanguageSwitch userId={session?.user.id} /></Card>
       <InstallCard />
       {stat && (
         <Card className="space-y-1">

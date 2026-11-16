@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Apple, ChefHat, Settings as Cog, ShoppingCart, Users } from 'lucide-react'
 import { configured, supabase } from '@/lib/supabase'
+import { setLang } from '@/lib/i18n'
 import { AppProvider, useApp } from '@/lib/session'
 import { flush, onOutboxChange, pendingCount } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
@@ -47,6 +48,11 @@ function Shell() {
   const loc = useLocation()
   const [tour, setTour] = useState(!onboardingSeen())
   useEffect(() => { const f = () => setTour(true); window.addEventListener('fs-tour', f); return () => window.removeEventListener('fs-tour', f) }, [])
+  // язык из профиля (если пользователь выбирал его на другом устройстве)
+  useEffect(() => {
+    if (!session) return
+    void supabase.from('user_settings').select('lang').maybeSingle().then(({ data }) => { if (data?.lang === 'ru' || data?.lang === 'en') setLang(data.lang) })
+  }, [session?.user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (space) void notifyExpiring(space.id) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [pending, setPending] = useState(pendingCount())
   useEffect(() => { void flush() }, [session])
