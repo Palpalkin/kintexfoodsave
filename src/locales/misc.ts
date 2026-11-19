@@ -24,6 +24,7 @@ const l: Locale = {
     'scanner.point': 'Наведите камеру на штрихкод', 'scanner.badCode': 'Штрихкод — это 8, 12, 13 или 14 цифр', 'scanner.manual': 'Или введите цифры кода',
     'ocr.preparing': 'Подготовка фото…', 'ocr.recognizing': 'Распознаю текст…', 'ocr.loadingModel': 'Загрузка модели (один раз)…',
     'utils.pcs': 'шт', 'utils.compressFail': 'Не удалось сжать изображение',
+    'expiryField.qDays': '{n} дн.',
   },
   en: {
     'scan.findingQr': 'Looking for the QR code…', 'scan.lookup': 'Fetching the receipt contents…', 'scan.kg': 'kg', 'scan.noteQr': 'Receipt contents were fetched via the QR code.',
@@ -48,6 +49,7 @@ const l: Locale = {
     'scanner.point': 'Point the camera at the barcode', 'scanner.badCode': 'A barcode is 8, 12, 13 or 14 digits', 'scanner.manual': 'Or type the code digits',
     'ocr.preparing': 'Preparing photo…', 'ocr.recognizing': 'Recognizing text…', 'ocr.loadingModel': 'Loading model (once)…',
     'utils.pcs': 'pcs', 'utils.compressFail': 'Could not compress the image',
+    'expiryField.qDays': '{n} d',
   },
 }
 export default l

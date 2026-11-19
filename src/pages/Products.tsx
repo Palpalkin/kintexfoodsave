@@ -66,6 +66,8 @@ export default function Products() {
   const [exp, setExp] = useState(emptyExpiry())
   const [nm, setNm] = useState('')
   const [unitV, setUnitV] = useState(defaultUnit())
+  const [qty, setQty] = useState('1')
+  const [showPhoto, setShowPhoto] = useState(false)
   const [locV, setLocV] = useState('')
   const [hist, setHist] = useState<Record<string, { name: string; unit: string; location: string | null; days: number | null }>>({})
   const [autofilled, setAutofilled] = useState(false)
@@ -204,7 +206,22 @@ export default function Products() {
   async function add(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!space || !session) return
-    const f = new FormData(e.currentTarget)
+    const form = e.currentTarget
+    const again = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'again'
+    const f = new FormData(form)
+    // Быстрый ввод: «молоко, хлеб, яйца» добавляет сразу несколько продуктов (без срока, его можно указать позже).
+    const names = String(f.get('name')).split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean)
+    if (names.length > 1) {
+      let failed = 0
+      for (const n of names.slice(0, 30)) {
+        const r = await run({ t: 'insert', table: 'products', row: { id: crypto.randomUUID(), space_id: space.id, created_by: session.user.id, name: n.slice(0, 120), quantity: 1, unit: defaultUnit(), location: locV.trim() || null, ...expiryFields(emptyExpiry()) } })
+        if (!r.ok) failed++
+      }
+      await load(0)
+      setToast({ text: failed ? t('products.saveFail', { msg: String(failed) }) : t('products.batchDone', { n: names.length }) })
+      setAdding(false); setNm(''); setAutofilled(false); setQty('1')
+      return
+    }
     const file = f.get('photo') as File
     const id = crypto.randomUUID()
     const row: Record<string, unknown> = {
@@ -226,7 +243,9 @@ export default function Products() {
     if (r.queued) { setItems((l) => [row as unknown as Product, ...l]); setToast({ text: t('products.queued') }) }
     else await load(0)
     if (fromShop) { await run({ t: 'delete', table: 'shopping_items', id: fromShop }); setFromShop(null) }
-    setAdding(false); setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null); setUnitV(defaultUnit()); setLocV(''); setAutofilled(false)
+    setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null); setAutofilled(false); setQty('1'); setShowPhoto(false); form.reset()
+    if (again) { setToast({ text: t('products.addedAgain', { name: String(row.name) }) }); return }
+    setAdding(false); setUnitV(defaultUnit()); setLocV('')
   }
 
   async function onBarcode(code: string) {
@@ -317,18 +336,41 @@ export default function Products() {
                   {favNames.slice(0, 12).map((n) => <button key={n} type="button" onClick={() => onName(n)} className="fs-pop rounded-full border border-green-200 bg-white px-2.5 py-1 text-xs">★ {n}</button>)}
                 </div>
               )}
+              {nm.trim().length >= 2 && !nm.includes(',') && !bc && (() => {
+                const q = nm.trim().toLowerCase()
+                const sg = Object.values(hist).filter((h) => h.name.toLowerCase().includes(q) && h.name.toLowerCase() !== q).slice(0, 5)
+                return sg.length > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{sg.map((h) => <button key={h.name} type="button" onClick={() => onName(h.name)} className="fs-pop rounded-full border border-green-200 bg-white px-2.5 py-1 text-xs">{h.name}</button>)}</div> : null
+              })()}
+              {nm.includes(',') && <p className="mt-1 text-xs text-green-800">{t('products.batchHint', { n: nm.split(/[,;]+/).filter((x) => x.trim()).length })}</p>}
               {autofilled && <p className="mt-1 text-xs text-green-800">{t('products.autofilled')}</p>}
               {bc && <p className="mt-1 text-xs text-green-900/70">{t('products.barcode')} {bc}{bcMsg ? ` · ${bcMsg}` : ''} <button type="button" className="underline" onClick={() => { setBc(null); setBcMsg(null) }}>{t('products.remove')}</button></p>}
             </div>
-            <div><Label>{t('products.qty')}</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
+            <div>
+              <Label>{t('products.qty')}</Label>
+              <div className="flex gap-1.5">
+                <Button type="button" variant="outline" size="icon" aria-label="−" onClick={() => setQty(String(Math.max(0, Math.round((Number(qty || 1) - partStep(unitV, Number(qty || 1))) * 1000) / 1000)))}>−</Button>
+                <Input name="quantity" type="number" inputMode="decimal" step="any" min="0" value={qty} onChange={(e) => setQty(e.target.value)} className="text-center" />
+                <Button type="button" variant="outline" size="icon" aria-label="+" onClick={() => setQty(String(Math.round((Number(qty || 0) + partStep(unitV, Number(qty || 1))) * 1000) / 1000))}>+</Button>
+              </div>
+            </div>
             <div><Label>{t('products.unit')}</Label><Input name="unit" value={unitV} onChange={(e) => setUnitV(e.target.value)} /></div>
-            <div className="col-span-2"><Label>{t('products.place')}</Label><Input name="location" placeholder={t('products.placePh')} value={locV} onChange={(e) => setLocV(e.target.value)} /></div>
+            <div className="col-span-2 -mt-1 flex flex-wrap gap-1.5">
+              {t('products.unitChips').split(',').map((u) => <button key={u} type="button" onClick={() => setUnitV(u)} className={cn('rounded-full border px-2.5 py-1 text-xs', unitV === u ? 'border-brand bg-brand-soft font-medium' : 'border-green-200 bg-white')}>{u}</button>)}
+            </div>
+            <div className="col-span-2">
+              <Label>{t('products.place')}</Label>
+              <Input name="location" placeholder={t('products.placePh')} value={locV} onChange={(e) => setLocV(e.target.value)} />
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {[...new Set([...t('products.locChips').split(','), ...locations.map((l) => l.charAt(0).toUpperCase() + l.slice(1))])].slice(0, 8).map((l) => <button key={l} type="button" onClick={() => setLocV(l)} className={cn('rounded-full border px-2.5 py-1 text-xs', locV.trim().toLowerCase() === l.toLowerCase() ? 'border-brand bg-brand-soft font-medium' : 'border-green-200 bg-white')}>{l}</button>)}
+              </div>
+            </div>
             <div className="col-span-2"><ExpiryField value={exp} onChange={setExp} hintDays={typicalDays(nm)} /></div>
             <div className="col-span-2">
-              <Label>{t('products.photo')}</Label>
-              <Input name="photo" type="file" accept="image/*" capture="environment" className="h-auto py-2" />
+              {showPhoto ? (<><Label>{t('products.photo')}</Label><Input name="photo" type="file" accept="image/*" capture="environment" className="h-auto py-2" /></>)
+                : <button type="button" onClick={() => setShowPhoto(true)} className="flex items-center gap-1.5 text-xs text-green-900/70 underline"><Camera size={14} />{t('products.addPhoto')}</button>}
             </div>
-            <Button className="col-span-2"><Camera size={16} />{t('common.save')}</Button>
+            <Button name="act" value="save" className="col-span-2"><Check size={16} />{t('common.save')}</Button>
+            <Button name="act" value="again" variant="outline" className="col-span-2"><Plus size={16} />{t('products.saveAgain')}</Button>
           </form>
         </Card>
       )}

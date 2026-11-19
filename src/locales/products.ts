@@ -23,6 +23,7 @@ const l: Locale = {
     'products.consumed': 'Использовано', 'products.thrownTitle': 'Выброшено',
     'products.swipeHint': 'Свайп вправо — использовано, влево — выброшено', 'products.more': 'Показать ещё',
     'products.planLimit': 'Лимит бесплатного тарифа: 100 продуктов. Оформите Pro в «Настройки → Тариф».',
+    'products.batchDone': 'Добавлено продуктов: {n}. Сроки можно указать позже, нажав на продукт.', 'products.batchHint': 'Будет добавлено {n} продуктов сразу (без срока)', 'products.addedAgain': '«{name}» добавлен — вводите следующий', 'products.saveAgain': 'Сохранить и добавить ещё', 'products.addPhoto': 'Добавить фото', 'products.unitChips': 'шт,г,кг,л,мл,уп.', 'products.locChips': 'Холодильник,Морозилка,Шкаф',
   },
   en: {
     'products.title': 'Products', 'products.noExpiry': 'no date', 'products.overdue': 'expired {n}d ago', 'products.today': 'today', 'products.daysN': '{n}d',
@@ -46,6 +47,7 @@ const l: Locale = {
     'products.consumed': 'Used', 'products.thrownTitle': 'Thrown away',
     'products.swipeHint': 'Swipe right — used, left — thrown away', 'products.more': 'Show more',
     'products.planLimit': 'Free plan limit: 100 products. Get Pro in "Settings → Plan".',
+    'products.batchDone': 'Products added: {n}. You can set expiry later by tapping a product.', 'products.batchHint': '{n} products will be added at once (no expiry)', 'products.addedAgain': '"{name}" added — enter the next one', 'products.saveAgain': 'Save and add another', 'products.addPhoto': 'Add photo', 'products.unitChips': 'pcs,g,kg,l,ml,pack', 'products.locChips': 'Fridge,Freezer,Pantry',
   },
 }
 export default l

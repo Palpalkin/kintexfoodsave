@@ -30,6 +30,11 @@ export function ExpiryField({ value: v, onChange, hintDays }: Props) {
           <span>{t('expiryField.hint', { n: hintDays })}</span><span className="font-semibold text-brand">{t('expiryField.apply')}</span>
         </button>
       )}
+      {v.mode === 'life' && (
+        <div className="flex flex-wrap gap-1.5">
+          {[3, 7, 14, 30, 90].map((n) => <button key={n} type="button" onClick={() => set({ amount: String(n), unit: 'days' })} className={cn('rounded-full border px-2.5 py-1 text-xs', v.amount === String(n) && v.unit === 'days' ? 'border-brand bg-brand-soft font-medium' : 'border-green-200 bg-white')}>{t('expiryField.qDays', { n })}</button>)}
+        </div>
+      )}
       {v.mode === 'life' ? (
         <div className="flex gap-2">
           <Input type="number" inputMode="numeric" min={1} placeholder="5" value={v.amount} onChange={(e) => set({ amount: e.target.value })} />
