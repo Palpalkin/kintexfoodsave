@@ -10,8 +10,19 @@ const RULES: [RegExp, number][] = [
   [/яблок/, 21], [/банан/, 5], [/апельсин|мандарин|лимон/, 14], [/виноград/, 7], [/клубник|малин|ягод/, 3],
   [/сок/, 5], [/пельмен|вареник|заморож/, 90],
 ]
+const RULES_EN: [RegExp, number][] = [
+  [/\bmilk/, 5], [/kefir|buttermilk/, 7], [/yogh?urt/, 10], [/sour cream/, 7], [/cottage cheese|quark/, 5], [/cream/, 5],
+  [/cheese/, 14], [/butter/, 30], [/\begg/, 25],
+  [/bread|loaf|bun|baguette|roll/, 4], [/tortilla|pita|wrap/, 5],
+  [/sausage|ham|salami|hot dog/, 7], [/bacon/, 7],
+  [/chicken|turkey|fillet|poultry/, 2], [/mince|ground (beef|meat|pork)/, 1], [/beef|pork|lamb|meat|steak/, 3], [/fish|salmon|trout|herring|shrimp|prawn|cod/, 2],
+  [/lettuce|salad|greens|dill|parsley|spinach|herb/, 4], [/cucumber/, 7], [/tomato/, 7], [/pepper|capsicum/, 10], [/mushroom/, 5],
+  [/carrot/, 21], [/cabbage/, 30], [/potato/, 30], [/onion|garlic/, 30], [/beet/, 21],
+  [/apple/, 21], [/banana/, 5], [/orange|tangerine|mandarin|lemon|lime/, 14], [/grape/, 7], [/strawberr|raspberr|berr|blueberr/, 3],
+  [/juice/, 5], [/dumpling|pierogi|frozen/, 90],
+]
 export function typicalDays(name: string): number | null {
   const n = name.toLowerCase().replace(/ё/g, 'е')
   if (n.trim().length < 3) return null
-  return RULES.find(([r]) => r.test(n))?.[1] ?? null
+  return RULES.find(([r]) => r.test(n))?.[1] ?? RULES_EN.find(([r]) => r.test(n))?.[1] ?? null
 }

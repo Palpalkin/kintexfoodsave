@@ -132,3 +132,23 @@ describe('part step', () => {
     expect(partStep('л', 1)).toBe(0.25)
   })
 })
+
+import { localizedBook } from '../recipeBook'
+import { EN_BOOK } from '../recipeBookEn'
+import { BOOK } from '../recipeBook'
+import { foodEmoji } from '../emoji'
+describe('english recipes', () => {
+  it('covers every Russian recipe with the same ingredient count', () => {
+    for (const r of BOOK) { expect(EN_BOOK[r.id], r.id).toBeTruthy(); expect(EN_BOOK[r.id].ing.length, r.id).toBe(r.ing.length) }
+  })
+  it('suggests shrimp fried rice from English product names', () => {
+    const stock = ['Rice', 'Shrimp', 'Sweet corn', 'Eggs', 'Soy sauce', 'Garlic'].map((name) => ({ name, expires_on: null }))
+    const picks = pickRecipes(stock, [], localizedBook('en'))
+    expect(picks[0].r.id).toBe('fried-rice-shrimp')
+    expect(picks[0].r.title).toMatch(/shrimp/i)
+  })
+  it('matches plurals and english shelf/emoji rules', () => {
+    expect(pickRecipes([{ name: 'Potatoes', expires_on: null }, { name: 'Onions', expires_on: null }], [], localizedBook('en')).some((p) => p.r.id === 'fried-potato')).toBe(true)
+    expect(typicalDays('Whole milk')).toBe(5); expect(foodEmoji('Fresh salmon')).toBe('🐟')
+  })
+})

@@ -4,9 +4,10 @@ import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { matches, parseIngredients } from '@/lib/match'
-import { daysLeft } from '@/lib/utils'
+import { daysLeft, defaultUnit } from '@/lib/utils'
+import { useT, useLang } from '@/lib/i18n'
 import { loadFavs } from '@/lib/favorites'
-import { MEAL_LABEL, type Meal } from '@/lib/recipeBook'
+import { MEAL_ORDER, mealLabel, localizedBook, type Meal } from '@/lib/recipeBook'
 import { pickRecipes } from '@/lib/recipePick'
 import { addToShopping } from '@/lib/shopping'
 import type { Recipe } from '@/lib/types'
@@ -19,6 +20,7 @@ type Stock = { name: string; expires_on: string | null }
 
 export default function Recipes() {
   const { space, session } = useApp()
+  const t = useT(); const lang = useLang()
   const [list, setList] = useState<Recipe[]>([])
   const [stock, setStock] = useState<Stock[]>([])
   const [draft, setDraft] = useState<Draft[]>([])
@@ -30,7 +32,7 @@ export default function Recipes() {
   const [meal, setMeal] = useState<Meal | null>(null)
   const [likes, setLikes] = useState<string[]>([])
   useEffect(() => { if (space) void loadFavs(space.id).then((f) => setLikes(f.map((x) => x.name))) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-  const book = useMemo(() => pickRecipes(stock, likes), [stock, likes])
+  const book = useMemo(() => pickRecipes(stock, likes, localizedBook(lang)), [stock, likes, lang])
 
   async function load() {
     if (!space) return
@@ -67,11 +69,11 @@ export default function Recipes() {
   async function suggest() {
     if (!space) return
     setBusy(true); setErr(null)
-    const { data, error } = await supabase.functions.invoke('ai-recipes', { body: { products: stock.slice(0, 25).map((s) => ({ name: s.name, quantity: 1, unit: 'шт', expires_on: s.expires_on })) } })
+    const { data, error } = await supabase.functions.invoke('ai-recipes', { body: { products: stock.slice(0, 25).map((s) => ({ name: s.name, quantity: 1, unit: defaultUnit(), expires_on: s.expires_on })) } })
     if (error || data?.error) {
       let m = data?.error as string | undefined
       if (!m && error && 'context' in error) { try { m = (await (error as { context: Response }).context.json()).error } catch { /* */ } }
-      setErr(m ?? error?.message ?? 'Ошибка AI')
+      setErr(m ?? error?.message ?? t('recipes.aiError'))
     } else setDraft(data.recipes ?? [])
     setBusy(false)
   }
@@ -87,7 +89,7 @@ export default function Recipes() {
     if (!space || !session) return
     let n = 0
     for (const m of missing) if ((await addToShopping(space.id, session.user.id, { name: m })) === 'added') n++
-    setNote(n ? `В список покупок добавлено: ${n}` : 'Всё это уже есть в списке покупок'); setTimeout(() => setNote(null), 3000)
+    setNote(n ? t('recipes.added', { n }) : t('recipes.alreadyInList')); setTimeout(() => setNote(null), 3000)
   }
 
   async function addManual(e: FormEvent<HTMLFormElement>) {
@@ -113,43 +115,43 @@ export default function Recipes() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Рецепты</h2>
+        <h2 className="text-lg font-semibold">{t('recipes.title')}</h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={suggest} disabled={busy || !stock.length} title="Нужен ключ AI в настройках Supabase"><Sparkles size={16} />{busy ? 'Думаю…' : 'AI-идеи'}</Button>
-          <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Свой'}</Button>
+          <Button size="sm" variant="outline" onClick={suggest} disabled={busy || !stock.length} title={t('recipes.aiHint')}><Sparkles size={16} />{busy ? t('recipes.thinking') : t('recipes.aiIdeas')}</Button>
+          <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? t('recipes.cancel') : t('recipes.own')}</Button>
         </div>
       </div>
 
       {adding && (
         <Card>
           <form onSubmit={addManual} className="space-y-3">
-            <div><Label>Название</Label><Input name="title" required maxLength={160} autoFocus /></div>
+            <div><Label>{t('recipes.name')}</Label><Input name="title" required maxLength={160} autoFocus /></div>
             <div>
-              <Label>Ингредиенты (по одному в строке: «молоко - 200 мл»)</Label>
-              <textarea name="ingredients" required rows={5} className="w-full rounded-lg border border-green-200 bg-white p-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-green-200" placeholder={'яйца - 3 шт\nмолоко - 200 мл\nмука - 150 г'} />
+              <Label>{t('recipes.ingLabel')}</Label>
+              <textarea name="ingredients" required rows={5} className="w-full rounded-lg border border-green-200 bg-white p-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-green-200" placeholder={t('recipes.ingPh')} />
             </div>
             <div>
-              <Label>Приготовление</Label>
+              <Label>{t('recipes.howTo')}</Label>
               <textarea name="instructions" rows={5} className="w-full rounded-lg border border-green-200 bg-white p-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-green-200" />
             </div>
-            <Button className="w-full">Сохранить рецепт</Button>
+            <Button className="w-full">{t('recipes.saveRecipe')}</Button>
           </form>
         </Card>
       )}
 
       {err && <Card className="border-orange-200 bg-orange-50 text-sm text-orange-900">{err}</Card>}
-      {draft.map((r, i) => view(r, <Button size="sm" variant="outline" onClick={() => save(r, 'ai')}>Сохранить</Button>, 'd' + i))}
+      {draft.map((r, i) => view(r, <Button size="sm" variant="outline" onClick={() => save(r, 'ai')}>{t('recipes.save')}</Button>, 'd' + i))}
 
       {stock.length > 0 && (
         <section className="space-y-2">
-          <h3 className="text-sm font-semibold text-green-900/80">Что приготовить из ваших продуктов</h3>
+          <h3 className="text-sm font-semibold text-green-900/80">{t('recipes.fromStock')}</h3>
           <div className="flex gap-2 overflow-x-auto">
-            {(Object.keys(MEAL_LABEL) as Meal[]).map((m) => (
-              <button key={m} onClick={() => setMeal(meal === m ? null : m)} className={`h-8 shrink-0 rounded-full border px-3 text-xs font-medium ${meal === m ? 'border-brand bg-brand-solid text-[#ffffff]' : 'border-green-200 bg-white'}`}>{MEAL_LABEL[m]}</button>
+            {MEAL_ORDER.map((m) => (
+              <button key={m} onClick={() => setMeal(meal === m ? null : m)} className={`h-8 shrink-0 rounded-full border px-3 text-xs font-medium ${meal === m ? 'border-brand bg-brand-solid text-[#ffffff]' : 'border-green-200 bg-white'}`}>{mealLabel(m)}</button>
             ))}
           </div>
           {note && <p className="fs-pop rounded-lg bg-brand-soft px-3 py-2 text-xs">{note}</p>}
-          {book.filter((b) => !meal || b.r.meals?.includes(meal)).length === 0 && <p className="text-sm text-green-900/60">Пока не нашли подходящих блюд. Добавьте больше продуктов (яйца, молоко, картофель, крупы, мясо, овощи) — подборка появится сама.</p>}
+          {book.filter((b) => !meal || b.r.meals?.includes(meal)).length === 0 && <p className="text-sm text-green-900/60">{t('recipes.none')}</p>}
           {book.filter((b) => !meal || b.r.meals?.includes(meal)).slice(0, 12).map(({ r, have, missing, saves }) => (
             <Card key={r.id} className="fs-rise space-y-2 p-3">
               <button className="flex w-full items-start gap-3 text-left" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
@@ -157,21 +159,21 @@ export default function Recipes() {
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold leading-tight">{r.title}</span>
                   <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <Badge className={missing.length ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>{missing.length ? `не хватает: ${missing.length}` : 'всё есть'}</Badge>
-                    {saves.slice(0, 2).map((x) => <Badge key={x.name} className="bg-orange-100 text-orange-800">спасёт: {x.name}</Badge>)}
-                    <span className="flex items-center gap-0.5 text-xs text-green-900/60"><Clock size={12} />{r.minutes} мин</span>
+                    <Badge className={missing.length ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>{missing.length ? t('recipes.missing', { n: missing.length }) : t('recipes.allHave')}</Badge>
+                    {saves.slice(0, 2).map((x) => <Badge key={x.name} className="bg-orange-100 text-orange-800">{t('recipes.saves', { name: x.name })}</Badge>)}
+                    <span className="flex items-center gap-0.5 text-xs text-green-900/60"><Clock size={12} />{t('recipes.min', { n: r.minutes })}</span>
                   </span>
                 </span>
                 <ChevronDown size={18} className={`mt-1 shrink-0 transition-transform ${openId === r.id ? 'rotate-180' : ''}`} />
               </button>
               {openId === r.id && (
                 <div className="fs-fade space-y-2 text-sm">
-                  <p className="text-xs"><span className="font-medium">Есть:</span> {have.join(', ')}.{missing.length > 0 && <> <span className="font-medium text-orange-800">Нужно докупить:</span> {missing.join(', ')}.</>}</p>
+                  <p className="text-xs"><span className="font-medium">{t('recipes.have')}</span> {have.join(', ')}.{missing.length > 0 && <> <span className="font-medium text-orange-800">{t('recipes.toBuy')}</span> {missing.join(', ')}.</>}</p>
                   <p className="text-xs text-green-900/70">{r.ing.map((i) => i.name.split('|')[0] + (i.amount ? ` — ${i.amount}` : '')).join(' · ')}</p>
                   <p>{r.steps}</p>
                   <div className="flex gap-2">
-                    {missing.length > 0 && <Button size="sm" variant="outline" onClick={() => buyMissing(missing)}><ShoppingCart size={14} />В покупки</Button>}
-                    <Button size="sm" variant="outline" onClick={() => save({ title: r.title, ingredients: r.ing.map((i) => ({ name: i.name.split('|')[0], amount: i.amount })), instructions: r.steps }, 'manual')}>Сохранить себе</Button>
+                    {missing.length > 0 && <Button size="sm" variant="outline" onClick={() => buyMissing(missing)}><ShoppingCart size={14} />{t('recipes.toShopping')}</Button>}
+                    <Button size="sm" variant="outline" onClick={() => save({ title: r.title, ingredients: r.ing.map((i) => ({ name: i.name.split('|')[0], amount: i.amount })), instructions: r.steps }, 'manual')}>{t('recipes.saveMine')}</Button>
                   </div>
                 </div>
               )}
@@ -182,18 +184,18 @@ export default function Recipes() {
 
       {ranked.length > 0 && (
         <>
-          <h3 className="pt-1 text-sm font-semibold text-green-900/80">Ваши рецепты, которые подходят</h3>
+          <h3 className="pt-1 text-sm font-semibold text-green-900/80">{t('recipes.yoursFit')}</h3>
           {ranked.slice(0, 5).map(({ r, have, total, saves }) => view(r, del(r.id), 'rk' + r.id, (
             <div className="flex flex-wrap gap-1.5">
-              <Badge className="bg-green-100 text-green-800">есть {have} из {total}</Badge>
-              {saves.slice(0, 3).map((s) => <Badge key={s.name} className="bg-orange-100 text-orange-800">спасёт: {s.name}{s.d >= 0 ? ` (${s.d} дн.)` : ' (просрочен)'}</Badge>)}
+              <Badge className="bg-green-100 text-green-800">{t('recipes.haveOf', { have, total })}</Badge>
+              {saves.slice(0, 3).map((s) => <Badge key={s.name} className="bg-orange-100 text-orange-800">{t('recipes.saves', { name: s.name })} ({s.d >= 0 ? t('recipes.daysLeft', { d: s.d }) : t('recipes.expired')})</Badge>)}
             </div>
           )))}
-          <h3 className="pt-1 text-sm font-semibold text-green-900/80">Все рецепты</h3>
+          <h3 className="pt-1 text-sm font-semibold text-green-900/80">{t('recipes.all')}</h3>
         </>
       )}
       {list.filter((r) => !ranked.slice(0, 5).some((x) => x.r.id === r.id)).map((r) => view(r, del(r.id), r.id))}
-      {!list.length && !draft.length && <p className="py-10 text-center text-sm text-green-900/60">Рецептов пока нет. Нажмите «Свой», чтобы добавить рецепт: приложение будет подсказывать, что приготовить из имеющихся продуктов.</p>}
+      {!list.length && !draft.length && <p className="py-10 text-center text-sm text-green-900/60">{t('recipes.empty')}</p>}
     </div>
   )
 }

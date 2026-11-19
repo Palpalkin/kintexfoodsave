@@ -1,7 +1,10 @@
 // Встроенная книга рецептов: работает без AI и без интернета. «|» в названии — синонимы продукта.
 // Базовые продукты (соль, перец, вода, растительное масло, сахар) считаются имеющимися.
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'dessert'
-export const MEAL_LABEL: Record<Meal, string> = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', dessert: 'Десерт' }
+import { t, type Lang } from './i18n'
+import { EN_BOOK } from './recipeBookEn'
+export const MEAL_ORDER: Meal[] = ['breakfast', 'lunch', 'dinner', 'dessert']
+export const mealLabel = (m: Meal) => t('recipes.meal.' + m)
 export type BookRecipe = { meals?: Meal[]; id: string; title: string; icon: string; minutes: number; ing: { name: string; amount?: string }[]; steps: string }
 
 export const STAPLES = ['соль', 'перец', 'вода', 'масло растительное', 'подсолнечное масло', 'сахар']
@@ -58,3 +61,12 @@ export const BOOK: BookRecipe[] = [
 
 const MEALS: Record<Meal, string[]> = {"breakfast": ["omelet", "scramble", "syrniki", "pancakes", "porridge", "toasts", "pancakes-kefir", "banana-pancakes", "casserole", "egg-sandwich-breakfast", "sandwich", "rice-egg-onion"], "lunch": ["borsch", "chicken-soup", "shchi", "okroshka", "salad-veg", "salad-cabbage", "olivier", "fried-rice-shrimp", "fried-rice-chicken", "fried-rice-sausage", "fried-rice-veg", "rice-tuna", "buckwheat", "pasta-cheese", "pasta-sausage", "wok-noodles", "curry-rice", "teriyaki-chicken", "chicken-rice", "rice-egg", "dumplings"], "dinner": ["baked-chicken", "plov", "cutlets", "fish-oven", "mushrooms", "fried-potato", "mashed", "rice-mushrooms", "lazy-cabbage-rolls", "stuffed-peppers", "fried-rice-shrimp", "fried-rice-chicken", "curry-rice", "teriyaki-chicken", "wok-noodles", "chicken-rice", "pasta-sausage", "dumplings"], "dessert": ["apple-pie", "rice-pudding", "syrniki", "casserole", "pancakes", "banana-pancakes"]}
 for (const r of BOOK) r.meals = (Object.keys(MEALS) as Meal[]).filter((m) => MEALS[m].includes(r.id))
+
+/** Книга на нужном языке: английский текст берём из recipeBookEn, служебные поля (id, иконка, время, приёмы пищи) общие. */
+export function localizedBook(lang: Lang): BookRecipe[] {
+  if (lang !== 'en') return BOOK
+  return BOOK.map((r) => {
+    const e = EN_BOOK[r.id]
+    return e ? { ...r, title: e.title, steps: e.steps, ing: e.ing.map(([name, amount]) => ({ name, amount })) } : r
+  })
+}

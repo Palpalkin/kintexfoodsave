@@ -1,11 +1,12 @@
 import { BOOK, STAPLES, type BookRecipe } from './recipeBook'
+import { STAPLES_EN } from './recipeBookEn'
 import { matches, matchesAll } from './match'
 import { daysLeft } from './utils'
 
 export type Stock = { name: string; expires_on: string | null }
 export type Pick = { r: BookRecipe; have: string[]; missing: string[]; saves: { name: string; d: number }[]; coverage: number; score: number }
 
-const isStaple = (n: string) => STAPLES.some((s) => n.toLowerCase() === s)
+const isStaple = (n: string) => STAPLES.some((s) => n.toLowerCase() === s) || STAPLES_EN.includes(n.toLowerCase())
 const alts = (n: string) => n.split('|').map((x) => x.trim())
 
 /** Что можно приготовить из продуктов в наличии. Приоритет: больше совпадений и спасение скоро портящегося. */
