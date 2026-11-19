@@ -1,5 +1,6 @@
 // Экспорт данных пространства: CSV продуктов (для Excel) и полная JSON-копия. Работает на клиенте, без серверов.
 import { supabase } from './supabase'
+import { tp } from './i18n'
 
 const esc = (v: unknown) => { const s = v == null ? '' : String(v); return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 
@@ -24,5 +25,5 @@ export async function exportData(spaceId: string, kind: 'csv' | 'json'): Promise
   const day = new Date().toISOString().slice(0, 10)
   if (kind === 'csv') download(`kintexfoodsave-${day}.csv`, toCsv(p.data ?? [], ['name', 'category', 'quantity', 'unit', 'location', 'produced_on', 'expires_on', 'status', 'notes']), 'text/csv;charset=utf-8')
   else download(`kintexfoodsave-${day}.json`, JSON.stringify({ exported: day, products: p.data, recipes: r.data, shopping: s.data }, null, 2), 'application/json')
-  return `Готово: ${p.data?.length ?? 0} продуктов`
+  return tp('export.done', p.data?.length ?? 0)
 }

@@ -1,5 +1,6 @@
 // Приветствие при первом запуске: 4 коротких шага. Состояние «показано» хранится в localStorage (только удобство).
 import { useState } from 'react'
+import { useT } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 
 const KEY = 'fs.onboarded.v1'
@@ -7,14 +8,11 @@ export const onboardingSeen = () => { try { return localStorage.getItem(KEY) ===
 export const markOnboarded = () => { try { localStorage.setItem(KEY, '1') } catch { /* */ } }
 export const resetOnboarding = () => { try { localStorage.removeItem(KEY) } catch { /* */ } }
 
-const STEPS = [
-  { icon: '🥗', title: 'Добро пожаловать!', text: 'KINTEXFOODSAVE следит за сроками годности, чтобы продукты не пропадали, а деньги не уходили в мусор.' },
-  { icon: '🧾', title: 'Сканируйте чеки', text: 'Сфотографируйте чек: приложение прочитает QR-код и список покупок. Останется указать срок годности каждого продукта.' },
-  { icon: '📅', title: 'Срок — как вам удобно', text: 'Введите «годен до» или дату производства и «годен 5 дней»: дату окончания посчитаем сами.' },
-  { icon: '👆', title: 'Свайпы и уведомления', text: 'Свайп вправо — использовано, влево — выброшено. В «Настройках» включите напоминания, они придут даже при закрытом приложении.' },
-]
+const ICONS = ['🥗', '🧾', '📅', '👆']
 
 export function Onboarding({ onClose }: { onClose: () => void }) {
+  const t = useT()
+  const STEPS = ICONS.map((icon, k) => ({ icon, title: t(`onboarding.${k + 1}.title`), text: t(`onboarding.${k + 1}.text`) }))
   const [i, setI] = useState(0)
   const s = STEPS[i]; const last = i === STEPS.length - 1
   const done = () => { markOnboarded(); onClose() }
@@ -28,8 +26,8 @@ export function Onboarding({ onClose }: { onClose: () => void }) {
           {STEPS.map((_, k) => <span key={k} className={`h-1.5 rounded-full transition-all ${k === i ? 'w-6 bg-brand-solid' : 'w-1.5 bg-green-200'}`} />)}
         </div>
         <div className="flex gap-2">
-          {!last && <Button variant="ghost" className="flex-1" onClick={done}>Пропустить</Button>}
-          <Button className="flex-1" onClick={() => (last ? done() : setI(i + 1))}>{last ? 'Начать' : 'Далее'}</Button>
+          {!last && <Button variant="ghost" className="flex-1" onClick={done}>{t('onboarding.skip')}</Button>}
+          <Button className="flex-1" onClick={() => (last ? done() : setI(i + 1))}>{last ? t('onboarding.start') : t('onboarding.next')}</Button>
         </div>
       </div>
     </div>

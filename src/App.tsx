@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Apple, ChefHat, Settings as Cog, ShoppingCart, Users } from 'lucide-react'
 import { configured, supabase } from '@/lib/supabase'
-import { setLang } from '@/lib/i18n'
+import { setLang, useT, t } from '@/lib/i18n'
 import { AppProvider, useApp } from '@/lib/session'
 import { flush, onOutboxChange, pendingCount } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
@@ -19,12 +19,12 @@ import { LegalPage, LEGAL_PATHS } from '@/pages/Legal'
 import { CookieNotice } from '@/components/CookieNotice'
 import { Onboarding, onboardingSeen } from '@/components/Onboarding'
 
-const tabs = [
-  { to: '/', label: 'Продукты', icon: Apple },
-  { to: '/shopping', label: 'Покупки', icon: ShoppingCart },
-  { to: '/recipes', label: 'Рецепты', icon: ChefHat },
-  { to: '/family', label: 'Семья', icon: Users },
-  { to: '/settings', label: 'Настройки', icon: Cog },
+const tabs = () => [
+  { to: '/', label: t('app.tab.products'), icon: Apple },
+  { to: '/shopping', label: t('app.tab.shopping'), icon: ShoppingCart },
+  { to: '/recipes', label: t('app.tab.recipes'), icon: ChefHat },
+  { to: '/family', label: t('app.tab.family'), icon: Users },
+  { to: '/settings', label: t('app.tab.settings'), icon: Cog },
 ]
 
 // Проверка сроков при открытии приложения (без фоновых процессов и опроса БД).
@@ -40,10 +40,11 @@ async function notifyExpiring(spaceId: string) {
   localStorage.setItem('fs.notified', today)
   const reg = await navigator.serviceWorker?.ready
   const body = soon.slice(0, 4).map((p) => p.name).join(', ') + (soon.length > 4 ? '…' : '')
-  reg?.showNotification(`Скоро истекает срок: ${soon.length}`, { body, icon: '/icon-192.png' })
+  reg?.showNotification(t('app.expiring', { n: soon.length }), { body, icon: '/icon-192.png' })
 }
 
 function Shell() {
+  const t = useT()
   const { session, ready, space, recovery, clearRecovery } = useApp()
   const loc = useLocation()
   const [tour, setTour] = useState(!onboardingSeen())
@@ -65,7 +66,7 @@ function Shell() {
   }, [])
 
   if (LEGAL_PATHS.includes(loc.pathname)) return <><LegalPage path={loc.pathname} /><CookieNotice /></>
-  if (!configured) return <div className="p-6 text-sm">Не настроены переменные окружения <code>VITE_SUPABASE_URL</code> и <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>. См. README.</div>
+  if (!configured) return <div className="p-6 text-sm">{t('app.envMissing', { a: 'VITE_SUPABASE_URL', b: 'VITE_SUPABASE_PUBLISHABLE_KEY' })}</div>
   if (!ready) return null
   if (!session) return <><Auth /><CookieNotice /></>
   if (recovery) return <NewPassword onDone={clearRecovery} />
@@ -74,7 +75,7 @@ function Shell() {
     <div className="mx-auto flex min-h-full max-w-xl flex-col">
       {pending > 0 && (
         <button onClick={() => void flush()} className="mx-4 mt-3 rounded-lg bg-orange-100 px-3 py-2 text-left text-xs text-orange-900">
-          Ожидает отправки: {pending}. {navigator.onLine ? 'Нажмите, чтобы отправить сейчас.' : 'Нет связи: отправится автоматически, когда появится интернет.'}
+          {t('app.pending', { n: pending })} {navigator.onLine ? t('app.pendingOnline') : t('app.pendingOffline')}
         </button>
       )}
       <CookieNotice />
@@ -93,7 +94,7 @@ function Shell() {
       </main>
       <nav className="fixed inset-x-0 bottom-0 border-t border-green-100 bg-white/90 backdrop-blur pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-xl">
-          {tabs.map(({ to, label, icon: I }) => (
+          {tabs().map(({ to, label, icon: I }) => (
             <NavLink key={to} to={to} end className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors', isActive ? 'text-brand font-semibold' : 'text-gray-500')}>
               {({ isActive }: { isActive: boolean }) => <>
                 <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-brand-soft')}><I size={20} className={isActive ? 'fs-pop' : ''} /></span>{label}

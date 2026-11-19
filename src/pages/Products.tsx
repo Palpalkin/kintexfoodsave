@@ -6,7 +6,8 @@ import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { compressImage } from '@/lib/image'
 import { flush, isOffline, run } from '@/lib/outbox'
-import { cn, daysLeft, partStep } from '@/lib/utils'
+import { cn, daysLeft, defaultUnit, partStep } from '@/lib/utils'
+import { t as tr, tp, useT } from '@/lib/i18n'
 import { ExpiryField } from '@/components/ExpiryField'
 import { BarcodeScanner } from '@/components/BarcodeScanner'
 import { lookupBarcode } from '@/lib/barcode'
@@ -39,18 +40,20 @@ function edgeTone(date: string | null) {
 type Filter = 'all' | 'soon' | 'expired' | 'fav'
 
 function ExpiryBadge({ date }: { date: string | null }) {
+  const t = useT()
   const d = daysLeft(date)
-  if (d === null) return <Badge className="bg-gray-100 text-gray-600">без срока</Badge>
-  if (d < 0) return <Badge className="fs-pulse bg-red-100 text-red-800">просрочено {-d} дн.</Badge>
-  if (d === 0) return <Badge className="fs-pulse bg-red-100 text-red-800">сегодня</Badge>
-  if (d <= 3) return <Badge className="bg-orange-100 text-orange-800">{d} дн.</Badge>
-  if (d <= 7) return <Badge className="bg-yellow-100 text-yellow-800">{d} дн.</Badge>
-  return <Badge className="bg-green-100 text-green-800">{d} дн.</Badge>
+  if (d === null) return <Badge className="bg-gray-100 text-gray-600">{t('products.noExpiry')}</Badge>
+  if (d < 0) return <Badge className="fs-pulse bg-red-100 text-red-800">{t('products.overdue', { n: -d })}</Badge>
+  if (d === 0) return <Badge className="fs-pulse bg-red-100 text-red-800">{t('products.today')}</Badge>
+  if (d <= 3) return <Badge className="bg-orange-100 text-orange-800">{t('products.daysN', { n: d })}</Badge>
+  if (d <= 7) return <Badge className="bg-yellow-100 text-yellow-800">{t('products.daysN', { n: d })}</Badge>
+  return <Badge className="bg-green-100 text-green-800">{t('products.daysN', { n: d })}</Badge>
 }
 
 const toExpiryState = (p: Product): ExpiryState => ({ ...emptyExpiry(), mode: 'until', until: p.expires_on ?? '', produced: p.produced_on ?? '' })
 
 export default function Products() {
+  const t = useT()
   const { space, session } = useApp()
   const [items, setItems] = useState<Product[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
@@ -62,7 +65,7 @@ export default function Products() {
   const [adding, setAdding] = useState(false)
   const [exp, setExp] = useState(emptyExpiry())
   const [nm, setNm] = useState('')
-  const [unitV, setUnitV] = useState('шт')
+  const [unitV, setUnitV] = useState(defaultUnit())
   const [locV, setLocV] = useState('')
   const [hist, setHist] = useState<Record<string, { name: string; unit: string; location: string | null; days: number | null }>>({})
   const [autofilled, setAutofilled] = useState(false)
@@ -131,8 +134,8 @@ export default function Products() {
     const before = items
     setItems((l) => l.map((x) => (x.id === p.id ? { ...x, quantity: left } : x)))
     const r = await run({ t: 'update', table: 'products', id: p.id, patch: { quantity: left } })
-    if (!r.ok) { setItems(before); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
-    setToast({ text: `«${p.name}»: осталось ${left} ${p.unit}`, action: { label: 'Отменить', run: () => { setItems((l) => l.map((x) => (x.id === p.id ? { ...x, quantity: p.quantity } : x))); void run({ t: 'update', table: 'products', id: p.id, patch: { quantity: p.quantity } }); setToast(null) } } })
+    if (!r.ok) { setItems(before); setToast({ text: t('products.saveFail', { msg: r.message }) }); return }
+    setToast({ text: t('products.left', { name: p.name, left, unit: p.unit }), action: { label: t('products.undo'), run: () => { setItems((l) => l.map((x) => (x.id === p.id ? { ...x, quantity: p.quantity } : x))); void run({ t: 'update', table: 'products', id: p.id, patch: { quantity: p.quantity } }); setToast(null) } } })
   }
 
   async function star(p: Product) {
@@ -140,10 +143,10 @@ export default function Products() {
     const k = favKey(p.name); const on = !favs.has(k)
     setFavs((s) => { const n = new Set(s); if (on) n.add(k); else n.delete(k); return n })
     const err = await toggleFav(space.id, session.user.id, p.name, p.unit, on)
-    if (err) { setFavs((s) => { const n = new Set(s); if (on) n.delete(k); else n.add(k); return n }); setToast({ text: 'Не удалось изменить: ' + err }) }
+    if (err) { setFavs((s) => { const n = new Set(s); if (on) n.delete(k); else n.add(k); return n }); setToast({ text: t('products.changeFail', { msg: err }) }) }
     else {
       setFavNames((l) => (on ? [...l, p.name] : l.filter((x) => favKey(x) !== k)))
-      setToast({ text: on ? `«${p.name}» — в любимых: закончится — предложим купить снова` : 'Убрано из любимых' })
+      setToast({ text: on ? t('products.favOn', { name: p.name }) : t('products.favOff') })
     }
   }
   useEffect(() => {
@@ -187,14 +190,14 @@ export default function Products() {
   async function setStatus(p: Product, status: 'consumed' | 'discarded') {
     setItems((l) => l.filter((x) => x.id !== p.id))
     const r = await run({ t: 'update', table: 'products', id: p.id, patch: { status } })
-    if (!r.ok) { setItems((l) => [p, ...l]); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
+    if (!r.ok) { setItems((l) => [p, ...l]); setToast({ text: t('products.saveFail', { msg: r.message }) }); return }
     if (!space || !session) return
     const shop = () => addToShopping(space.id, session.user.id, { name: p.name, unit: p.unit })
     if (status === 'consumed' && (autoShopEnabled() || favs.has(favKey(p.name)))) {
       const r = await shop()
-      setToast({ text: r === 'added' ? `«${p.name}» добавлено в список покупок` : `«${p.name}» уже в списке покупок` })
+      setToast({ text: r === 'added' ? t('products.shopAdded', { name: p.name }) : t('products.shopExists', { name: p.name }) })
     } else if (status === 'discarded') {
-      setToast({ text: `«${p.name}» выброшено`, action: { label: 'В покупки', run: () => { void shop(); setToast(null) } } })
+      setToast({ text: t('products.discarded', { name: p.name }), action: { label: t('products.toShop'), run: () => { void shop(); setToast(null) } } })
     }
   }
 
@@ -207,7 +210,7 @@ export default function Products() {
     const row: Record<string, unknown> = {
       id, space_id: space.id, created_by: session.user.id,
       name: String(f.get('name')).trim(),
-      quantity: Number(f.get('quantity') || 1), unit: String(f.get('unit') || 'шт'),
+      quantity: Number(f.get('quantity') || 1), unit: String(f.get('unit') || defaultUnit()),
       location: String(f.get('location') || '') || null,
       barcode: bc,
       ...expiryFields(exp),
@@ -219,18 +222,18 @@ export default function Products() {
       if (!up.error) row.photo_path = path
     }
     const r = await run({ t: 'insert', table: 'products', row })
-    if (!r.ok) { setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
-    if (r.queued) { setItems((l) => [row as unknown as Product, ...l]); setToast({ text: 'Нет связи: сохранено на устройстве, отправится позже' }) }
+    if (!r.ok) { setToast({ text: t('products.saveFail', { msg: r.message }) }); return }
+    if (r.queued) { setItems((l) => [row as unknown as Product, ...l]); setToast({ text: t('products.queued') }) }
     else await load(0)
     if (fromShop) { await run({ t: 'delete', table: 'shopping_items', id: fromShop }); setFromShop(null) }
-    setAdding(false); setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null); setUnitV('шт'); setLocV(''); setAutofilled(false)
+    setAdding(false); setExp(emptyExpiry()); setNm(''); setBc(null); setBcMsg(null); setUnitV(defaultUnit()); setLocV(''); setAutofilled(false)
   }
 
   async function onBarcode(code: string) {
-    setScanning(false); setBc(code); setBcMsg('Ищу название…')
+    setScanning(false); setBc(code); setBcMsg(t('products.bcSearching'))
     const found = space ? await lookupBarcode(code, space.id) : null
-    if (found) { setNm(found.name); setBcMsg(found.source === 'history' ? 'Название из ваших прошлых продуктов' : 'Название найдено в базе Open Food Facts, проверьте его') }
-    else setBcMsg('Название не найдено: введите его, я запомню его для этого штрихкода')
+    if (found) { setNm(found.name); setBcMsg(found.source === 'history' ? t('products.bcHistory') : t('products.bcOff')) }
+    else setBcMsg(t('products.bcNone'))
   }
 
   function startEdit(p: Product) { setEditing(p); setEditExp(toExpiryState(p)); setOpenedOn(null) }
@@ -250,7 +253,7 @@ export default function Products() {
     const f = new FormData(e.currentTarget)
     const patch = {
       name: String(f.get('name')).trim() || editing.name,
-      quantity: Number(f.get('quantity') || 0), unit: String(f.get('unit') || 'шт'),
+      quantity: Number(f.get('quantity') || 0), unit: String(f.get('unit') || defaultUnit()),
       location: String(f.get('location') || '') || null,
       ...expiryFields(editExp),
       ...(openedOn ? { opened_on: openedOn } : {}),
@@ -258,7 +261,7 @@ export default function Products() {
     const before = items
     setItems((l) => l.map((x) => (x.id === editing.id ? { ...x, ...patch } : x)))
     const r = await run({ t: 'update', table: 'products', id: editing.id, patch })
-    if (!r.ok) { setItems(before); setToast({ text: 'Не удалось сохранить: ' + r.message }); return }
+    if (!r.ok) { setItems(before); setToast({ text: t('products.saveFail', { msg: r.message }) }); return }
     setEditing(null)
   }
 
@@ -292,10 +295,10 @@ export default function Products() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5"><img src="/icon-192.png" alt="" className="fs-float h-9 w-9 rounded-xl shadow-sm" /><h2 className="text-xl font-bold tracking-tight">Продукты</h2></div>
+        <div className="flex items-center gap-2.5"><img src="/icon-192.png" alt="" className="fs-float h-9 w-9 rounded-xl shadow-sm" /><h2 className="text-xl font-bold tracking-tight">{t('products.title')}</h2></div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />Чек</Link></Button>
-          <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? 'Отмена' : 'Добавить'}</Button>
+          <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />{t('products.receipt')}</Link></Button>
+          <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? t('common.cancel') : t('common.add')}</Button>
         </div>
       </div>
 
@@ -303,29 +306,29 @@ export default function Products() {
         <Card>
           <form onSubmit={add} className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <Label>Название</Label>
+              <Label>{t('products.name')}</Label>
               <div className="flex gap-2">
                 <Input name="name" required maxLength={120} autoFocus list="fs-names" autoComplete="off" value={nm} onChange={(e) => onName(e.target.value)} />
                 <datalist id="fs-names">{Object.values(hist).slice(0, 100).map((h) => <option key={h.name} value={h.name} />)}</datalist>
-                <Button type="button" variant="outline" size="icon" title="Сканировать штрихкод" onClick={() => setScanning(true)}><Barcode size={18} /></Button>
+                <Button type="button" variant="outline" size="icon" title={t('products.scanBarcode')} onClick={() => setScanning(true)}><Barcode size={18} /></Button>
               </div>
               {!nm && favNames.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {favNames.slice(0, 12).map((n) => <button key={n} type="button" onClick={() => onName(n)} className="fs-pop rounded-full border border-green-200 bg-white px-2.5 py-1 text-xs">★ {n}</button>)}
                 </div>
               )}
-              {autofilled && <p className="mt-1 text-xs text-green-800">Подставлено из прошлых покупок: единица, место, срок в днях. Укажите дату производства.</p>}
-              {bc && <p className="mt-1 text-xs text-green-900/70">Штрихкод {bc}{bcMsg ? ` · ${bcMsg}` : ''} <button type="button" className="underline" onClick={() => { setBc(null); setBcMsg(null) }}>убрать</button></p>}
+              {autofilled && <p className="mt-1 text-xs text-green-800">{t('products.autofilled')}</p>}
+              {bc && <p className="mt-1 text-xs text-green-900/70">{t('products.barcode')} {bc}{bcMsg ? ` · ${bcMsg}` : ''} <button type="button" className="underline" onClick={() => { setBc(null); setBcMsg(null) }}>{t('products.remove')}</button></p>}
             </div>
-            <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
-            <div><Label>Единица</Label><Input name="unit" value={unitV} onChange={(e) => setUnitV(e.target.value)} /></div>
-            <div className="col-span-2"><Label>Место</Label><Input name="location" placeholder="холодильник" value={locV} onChange={(e) => setLocV(e.target.value)} /></div>
+            <div><Label>{t('products.qty')}</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={1} /></div>
+            <div><Label>{t('products.unit')}</Label><Input name="unit" value={unitV} onChange={(e) => setUnitV(e.target.value)} /></div>
+            <div className="col-span-2"><Label>{t('products.place')}</Label><Input name="location" placeholder={t('products.placePh')} value={locV} onChange={(e) => setLocV(e.target.value)} /></div>
             <div className="col-span-2"><ExpiryField value={exp} onChange={setExp} hintDays={typicalDays(nm)} /></div>
             <div className="col-span-2">
-              <Label>Фото (сжимается перед загрузкой)</Label>
+              <Label>{t('products.photo')}</Label>
               <Input name="photo" type="file" accept="image/*" capture="environment" className="h-auto py-2" />
             </div>
-            <Button className="col-span-2"><Camera size={16} />Сохранить</Button>
+            <Button className="col-span-2"><Camera size={16} />{t('common.save')}</Button>
           </form>
         </Card>
       )}
@@ -336,13 +339,13 @@ export default function Products() {
         <>
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-green-900/40" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию или месту" className="pl-9" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('products.search')} className="pl-9" />
           </div>
           <div className="flex gap-2 overflow-x-auto">
-            {chip('all', 'Все')}
-            {chip('soon', 'Скоро (≤3 дн.)', stats.soon)}
-            {chip('expired', 'Просрочено', stats.expired, stats.expired ? 'text-red-700' : '')}
-            {favs.size > 0 && chip('fav', '★ Любимые')}
+            {chip('all', t('products.fAll'))}
+            {chip('soon', t('products.fSoon'), stats.soon)}
+            {chip('expired', t('products.fExpired'), stats.expired, stats.expired ? 'text-red-700' : '')}
+            {favs.size > 0 && chip('fav', t('products.fFav'))}
           </div>
           {locations.length > 1 && (
             <div className="flex gap-2 overflow-x-auto">
@@ -357,28 +360,28 @@ export default function Products() {
       {!items.length && !loading && (
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <img src="/logo-pair.webp" alt="" className="h-36 w-auto" />
-          <p className="text-sm text-green-900/60">Пока пусто. Добавьте продукт или отсканируйте чек.</p>
+          <p className="text-sm text-green-900/60">{t('products.empty')}</p>
         </div>
       )}
-      {items.length > 0 && !shown.length && <p className="py-6 text-center text-sm text-green-900/60">Ничего не найдено.</p>}
+      {items.length > 0 && !shown.length && <p className="py-6 text-center text-sm text-green-900/60">{t('products.notFound')}</p>}
 
       {shown.map((p, idx) => editing?.id === p.id ? (
         <Card key={p.id}>
           <form onSubmit={saveEdit} className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><Label>Название</Label><Input name="name" required maxLength={120} defaultValue={p.name} /></div>
-            <div><Label>Количество</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={p.quantity} /></div>
-            <div><Label>Единица</Label><Input name="unit" defaultValue={p.unit} /></div>
-            <div className="col-span-2"><Label>Место</Label><Input name="location" defaultValue={p.location ?? ''} placeholder="холодильник" /></div>
+            <div className="col-span-2"><Label>{t('products.name')}</Label><Input name="name" required maxLength={120} defaultValue={p.name} /></div>
+            <div><Label>{t('products.qty')}</Label><Input name="quantity" type="number" step="any" min="0" defaultValue={p.quantity} /></div>
+            <div><Label>{t('products.unit')}</Label><Input name="unit" defaultValue={p.unit} /></div>
+            <div className="col-span-2"><Label>{t('products.place')}</Label><Input name="location" defaultValue={p.location ?? ''} placeholder={t('products.placePh')} /></div>
             <div className="col-span-2"><ExpiryField value={editExp} onChange={setEditExp} /></div>
             <div className="col-span-2 flex items-center gap-2 rounded-lg bg-brand-soft p-2 text-xs">
-              <span className="shrink-0">После вскрытия годен</span>
-              <input type="number" min={1} max={365} value={openDays} onChange={(e) => setOpenDays(e.target.value)} className="h-8 w-14 rounded-md border border-green-200 bg-white px-2 text-center text-sm" aria-label="Дней после вскрытия" />
-              <span className="shrink-0">дн.</span>
-              <button type="button" onClick={markOpened} className="ml-auto h-8 shrink-0 rounded-md bg-brand-solid px-3 font-medium text-[#ffffff]">Вскрыл сегодня</button>
+              <span className="shrink-0">{t('products.afterOpen')}</span>
+              <input type="number" min={1} max={365} value={openDays} onChange={(e) => setOpenDays(e.target.value)} className="h-8 w-14 rounded-md border border-green-200 bg-white px-2 text-center text-sm" aria-label={t('products.openDaysAria')} />
+              <span className="shrink-0">{t('products.daysShort')}</span>
+              <button type="button" onClick={markOpened} className="ml-auto h-8 shrink-0 rounded-md bg-brand-solid px-3 font-medium text-[#ffffff]">{t('products.openedToday')}</button>
             </div>
-            {openedOn && <p className="col-span-2 text-xs text-green-900/70">Срок пересчитан. Нажмите «Сохранить».</p>}
-            <Button type="button" variant="outline" onClick={() => setEditing(null)}>Отмена</Button>
-            <Button>Сохранить</Button>
+            {openedOn && <p className="col-span-2 text-xs text-green-900/70">{t('products.recalc')}</p>}
+            <Button type="button" variant="outline" onClick={() => setEditing(null)}>{t('common.cancel')}</Button>
+            <Button>{t('common.save')}</Button>
           </form>
         </Card>
       ) : (
@@ -391,22 +394,22 @@ export default function Products() {
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1">
               <span className="min-w-0 break-words font-medium leading-snug">{p.name}</span>
-              <button type="button" aria-label="Любимый" aria-pressed={favs.has(favKey(p.name))} onClick={() => void star(p)} className="shrink-0 p-0.5"><Star size={16} className={favs.has(favKey(p.name)) ? 'fill-yellow-400 text-yellow-500' : 'text-green-900/30'} /></button>
+              <button type="button" aria-label={t('products.favorite')} aria-pressed={favs.has(favKey(p.name))} onClick={() => void star(p)} className="shrink-0 p-0.5"><Star size={16} className={favs.has(favKey(p.name)) ? 'fill-yellow-400 text-yellow-500' : 'text-green-900/30'} /></button>
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-green-900/60">
-              <span className="inline-flex items-center gap-1">{p.quantity} {p.unit}<button type="button" onClick={() => void usePart(p)} aria-label="Использовал часть" title="Использовал часть" className="flex h-5 w-5 items-center justify-center rounded-full border border-green-200 bg-white text-xs font-bold leading-none text-green-900/70">−</button></span>{p.brand && <span>· {p.brand}</span>}{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· произв. {fmt(p.produced_on)}</span>}
+              <span className="inline-flex items-center gap-1">{p.quantity} {p.unit}<button type="button" onClick={() => void usePart(p)} aria-label={t('products.usedPart')} title={t('products.usedPart')} className="flex h-5 w-5 items-center justify-center rounded-full border border-green-200 bg-white text-xs font-bold leading-none text-green-900/70">−</button></span>{p.brand && <span>· {p.brand}</span>}{p.location && <span>· {p.location}</span>}{p.produced_on && <span>· {t('products.produced', { date: fmt(p.produced_on) })}</span>}
             </div>
             <div className="mt-1.5"><ExpiryBadge date={p.expires_on} /></div>
           </div>
           <div className="-mr-1 flex shrink-0">
-            <Button variant="ghost" size="icon" title="Изменить" onClick={() => startEdit(p)}><Pencil size={16} className="text-green-900/60" /></Button>
-            <Button variant="ghost" size="icon" title="Использовано" onClick={() => setStatus(p, 'consumed')}><Check size={18} className="text-brand" /></Button>
-            <Button variant="ghost" size="icon" title="Выброшено" onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className="text-red-600" /></Button>
+            <Button variant="ghost" size="icon" title={t('products.edit')} onClick={() => startEdit(p)}><Pencil size={16} className="text-green-900/60" /></Button>
+            <Button variant="ghost" size="icon" title={t('products.consumed')} onClick={() => setStatus(p, 'consumed')}><Check size={18} className="text-brand" /></Button>
+            <Button variant="ghost" size="icon" title={t('products.thrownTitle')} onClick={() => setStatus(p, 'discarded')}><Trash2 size={18} className="text-red-600" /></Button>
           </div>
         </Card></SwipeRow>
       ))}
-      {shown.length > 0 && <p className="pt-1 text-center text-xs text-green-900/50">Свайп вправо — использовано, влево — выброшено</p>}
-      {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>Показать ещё</Button>}
+      {shown.length > 0 && <p className="pt-1 text-center text-xs text-green-900/50">{t('products.swipeHint')}</p>}
+      {more && <Button variant="outline" className="w-full" disabled={loading} onClick={() => load(items.length)}>{t('products.more')}</Button>}
 
       {toast && (
         <div className="fs-toast fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl bg-green-950 px-4 py-3 text-sm text-[#ffffff] shadow-lg">

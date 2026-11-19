@@ -1,6 +1,7 @@
 // Офлайн-очередь записей: при отсутствии сети операции кладутся в localStorage
 // и отправляются при восстановлении соединения.
 import { supabase } from './supabase'
+import { t } from './i18n'
 
 type Table = 'products' | 'shopping_items'
 type Op =
@@ -23,6 +24,9 @@ const exec = (op: Op) =>
   : op.t === 'update' ? supabase.from(op.table).update(op.patch).eq('id', op.id)
   : supabase.from(op.table).delete().eq('id', op.id)
 
+/** Понятное сообщение вместо технической ошибки сервера (лимит тарифа). */
+export const friendlyError = (message: string) => (message.includes('plan_limit_products') ? t('products.planLimit') : message)
+
 export type RunResult = { ok: true; queued: boolean } | { ok: false; message: string }
 
 /** Выполняет запись: онлайн — сразу; сети нет или запрос оборвался — в очередь (не теряется). Отказ сервера (права, данные) возвращается как ошибка. */
@@ -31,7 +35,7 @@ export async function run(op: Op): Promise<RunResult> {
   let res
   try { res = await exec(op) } catch { enqueue(op); return { ok: true, queued: true } }
   if (!res.error) return { ok: true, queued: false }
-  if (res.error.code) return { ok: false, message: res.error.message }
+  if (res.error.code) return { ok: false, message: friendlyError(res.error.message) }
   enqueue(op); return { ok: true, queued: true }
 }
 

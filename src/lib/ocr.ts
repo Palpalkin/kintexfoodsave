@@ -1,6 +1,7 @@
 // OCR чека прямо в браузере (tesseract.js). Движок и русская модель лежат в /tesseract
 // на нашем же домене: бесплатно, без внешних API, после первой загрузки кэшируются service worker'ом.
 import { createWorker, OEM, PSM } from 'tesseract.js'
+import { t } from './i18n'
 
 /** Подготовка фото: масштаб до ~1700px по ширине, оттенки серого, растяжение контраста. */
 async function prepare(file: File): Promise<HTMLCanvasElement> {
@@ -33,7 +34,7 @@ async function prepare(file: File): Promise<HTMLCanvasElement> {
 }
 
 export async function recognizeReceipt(file: File, onProgress: (p: number, label: string) => void): Promise<string> {
-  onProgress(0.02, 'Подготовка фото…')
+  onProgress(0.02, t('ocr.preparing'))
   const canvas = await prepare(file)
   const worker = await createWorker('rus', OEM.LSTM_ONLY, {
     workerPath: '/tesseract/worker.min.js',
@@ -41,8 +42,8 @@ export async function recognizeReceipt(file: File, onProgress: (p: number, label
     langPath: '/tesseract/lang',
     gzip: true,
     logger: (m: { status: string; progress: number }) => {
-      if (m.status === 'recognizing text') onProgress(0.2 + m.progress * 0.8, 'Распознаю текст…')
-      else if (m.status.includes('loading')) onProgress(0.1 + m.progress * 0.1, 'Загрузка модели (один раз)…')
+      if (m.status === 'recognizing text') onProgress(0.2 + m.progress * 0.8, t('ocr.recognizing'))
+      else if (m.status.includes('loading')) onProgress(0.1 + m.progress * 0.1, t('ocr.loadingModel'))
     },
   })
   try {

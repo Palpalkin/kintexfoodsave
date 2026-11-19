@@ -1,3 +1,4 @@
+import { t } from './i18n'
 // Сжатие фото на клиенте перед загрузкой: макс. 1024px, WebP ~0.8 (обычно < 150 КБ).
 export async function compressImage(file: File, maxSide = 1024, quality = 0.8): Promise<Blob> {
   const bmp = await createImageBitmap(file)
@@ -9,6 +10,6 @@ export async function compressImage(file: File, maxSide = 1024, quality = 0.8): 
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/webp', quality))
   if (blob) return blob
   const jpg = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', quality))
-  if (!jpg) throw new Error('Не удалось сжать изображение')
+  if (!jpg) throw new Error(t('utils.compressFail'))
   return jpg
 }

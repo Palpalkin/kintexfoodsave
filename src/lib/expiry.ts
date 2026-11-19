@@ -1,10 +1,12 @@
+import { locale, t } from './i18n'
 // Срок годности: «годен до <дата>» либо «дата производства + годен N дней/недель/месяцев/лет».
 export type Unit = 'days' | 'weeks' | 'months' | 'years'
 export type ExpiryState = { mode: 'until' | 'life'; produced: string; until: string; amount: string; unit: Unit }
 
 export const emptyExpiry = (): ExpiryState => ({ mode: 'life', produced: '', until: '', amount: '', unit: 'days' })
 
-export const UNIT_LABEL: Record<Unit, string> = { days: 'дней', weeks: 'недель', months: 'месяцев', years: 'лет' }
+export const UNITS: Unit[] = ['days', 'weeks', 'months', 'years']
+export const unitLabel = (u: Unit) => t('expiry.unit.' + u)
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const parse = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
@@ -42,4 +44,4 @@ export function expiryFields(s: ExpiryState) {
   return { expires_on, produced_on, shelf_life_days }
 }
 
-export const fmt = (s: string) => s.split('-').reverse().join('.')
+export const fmt = (s: string) => s.split('-').reverse().join(locale() === 'ru-RU' ? '.' : '/')

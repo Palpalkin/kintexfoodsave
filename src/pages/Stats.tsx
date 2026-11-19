@@ -4,10 +4,12 @@ import { ChevronLeft, Flame } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
+import { locale, tp, useT } from '@/lib/i18n'
 import { summarize, type Gone } from '@/lib/stats'
 import { Card } from '@/components/ui/card'
 
 export default function Stats() {
+  const t = useT()
   const { space } = useApp()
   const [rows, setRows] = useState<Gone[] | null>(null)
 
@@ -28,24 +30,24 @@ export default function Stats() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Link to="/settings" aria-label="Назад" className="rounded-full p-1 hover:bg-green-100"><ChevronLeft size={22} /></Link>
-        <h2 className="text-lg font-semibold">Статистика</h2>
+        <Link to="/settings" aria-label={t('common.back')} className="rounded-full p-1 hover:bg-green-100"><ChevronLeft size={22} /></Link>
+        <h2 className="text-lg font-semibold">{t('stats.title')}</h2>
       </div>
-      {rows === null ? <p className="py-10 text-center text-sm text-green-900/60">Загрузка…</p> : (
+      {rows === null ? <p className="py-10 text-center text-sm text-green-900/60">{t('common.loading')}</p> : (
         <>
           {s.streak !== null || total.e > 0 ? (
             <Card className="fs-rise flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-800"><Flame size={26} /></span>
               <div>
-                <div className="text-2xl font-bold">{s.streak ?? '—'}{s.streak !== null && ' дн.'}</div>
-                <div className="text-xs text-green-900/60">{s.streak === null ? 'ничего не выброшено за 6 месяцев — отлично!' : 'без выброса продуктов'}</div>
+                <div className="text-2xl font-bold">{s.streak ?? '—'}{s.streak !== null && ' ' + t('stats.daysShort')}</div>
+                <div className="text-xs text-green-900/60">{s.streak === null ? t('stats.noWaste') : t('stats.streak')}</div>
               </div>
             </Card>
           ) : null}
 
           <Card className="fs-rise space-y-3">
-            <p className="text-xs font-medium text-green-900/60">Последние 6 месяцев</p>
-            <div className="flex h-36 items-end gap-2" role="img" aria-label="Диаграмма по месяцам: использовано и выброшено">
+            <p className="text-xs font-medium text-green-900/60">{t('stats.last6')}</p>
+            <div className="flex h-36 items-end gap-2" role="img" aria-label={t('stats.chartLabel')}>
               {s.months.map((m) => (
                 <div key={m.key} className="flex h-full flex-1 flex-col justify-end gap-0.5 text-center">
                   <div className="flex flex-col justify-end overflow-hidden rounded-md" style={{ height: `${((m.eaten + m.thrown) / max) * 100}%`, minHeight: m.eaten + m.thrown ? 6 : 0 }}>
@@ -56,19 +58,19 @@ export default function Stats() {
                 </div>
               ))}
             </div>
-            <div className="flex gap-4 text-xs"><span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-green-600" />использовано {total.e}</span><span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-red-500" />выброшено {total.t}</span></div>
-            {total.l > 0 && <p className="text-sm">Выброшено на сумму около <b className="text-red-600">{Math.round(total.l).toLocaleString('ru-RU')} ₽</b> (по продуктам с ценой из чеков)</p>}
+            <div className="flex gap-4 text-xs"><span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-green-600" />{t('stats.eaten', { n: total.e })}</span><span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-sm bg-red-500" />{t('stats.thrown', { n: total.t })}</span></div>
+            {total.l > 0 && <p className="text-sm">{t('stats.lostPre')} <b className="text-red-600">{Math.round(total.l).toLocaleString(locale())} {t('stats.currency')}</b> {t('stats.lostPost')}</p>}
           </Card>
 
           {s.top.length > 0 && (
             <Card className="fs-rise space-y-2">
-              <p className="text-xs font-medium text-green-900/60">Чаще всего выбрасываете</p>
-              {s.top.map((t) => <div key={t.name} className="flex items-center justify-between text-sm"><span className="capitalize">{t.name}</span><span className="text-red-600">{t.n} раз</span></div>)}
-              <p className="text-xs text-green-900/60">Совет: покупайте меньше или поставьте напоминание заранее.</p>
+              <p className="text-xs font-medium text-green-900/60">{t('stats.top')}</p>
+              {s.top.map((x) => <div key={x.name} className="flex items-center justify-between text-sm"><span className="capitalize">{x.name}</span><span className="text-red-600">{tp('stats.times', x.n)}</span></div>)}
+              <p className="text-xs text-green-900/60">{t('stats.tip')}</p>
             </Card>
           )}
-          {total.e + total.t === 0 && <p className="py-6 text-center text-sm text-green-900/60">Данных пока нет. Отмечайте продукты «использовано» или «выброшено» — здесь появится картина по месяцам.</p>}
-          <p className="text-center text-xs text-green-900/50">Месяц определяется по дате последнего изменения продукта.</p>
+          {total.e + total.t === 0 && <p className="py-6 text-center text-sm text-green-900/60">{t('stats.empty')}</p>}
+          <p className="text-center text-xs text-green-900/50">{t('stats.note')}</p>
         </>
       )}
     </div>

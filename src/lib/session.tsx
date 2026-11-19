@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from './supabase'
+import { t } from './i18n'
 import { cacheGet, cacheSet } from './cache'
 import type { Space } from './types'
 
@@ -35,7 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let { data } = await supabase.from('spaces').select('id,name,invite_code,owner_id').order('created_at')
     if (data && data.length === 0) {
       // Первый вход: создаём личное пространство.
-      await supabase.from('spaces').insert({ name: 'Мой дом' })
+      await supabase.from('spaces').insert({ name: t('app.defaultSpace') })
       ;({ data } = await supabase.from('spaces').select('id,name,invite_code,owner_id').order('created_at'))
     }
     if (data) { setSpaces(data); cacheSet('spaces', data) }

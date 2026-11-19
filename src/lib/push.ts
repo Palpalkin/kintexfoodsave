@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { t } from './i18n'
 
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 export const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true
@@ -17,9 +18,9 @@ export async function currentSubscription() {
 }
 
 export async function enablePush(userId: string) {
-  if ((await Notification.requestPermission()) !== 'granted') throw new Error('Уведомления запрещены в настройках браузера')
+  if ((await Notification.requestPermission()) !== 'granted') throw new Error(t('push.denied'))
   const { data, error } = await supabase.functions.invoke('send-expiry-push', { body: { action: 'public-key' } })
-  if (error || !data?.publicKey) throw new Error('Не удалось получить ключ уведомлений')
+  if (error || !data?.publicKey) throw new Error(t('push.noKey'))
   const reg = await navigator.serviceWorker.ready
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(data.publicKey) as BufferSource })
   const j = sub.toJSON()
@@ -36,6 +37,6 @@ export async function disablePush() {
 
 export async function testPush(): Promise<string> {
   const { data, error } = await supabase.functions.invoke('send-expiry-push', { body: { action: 'test' } })
-  if (error) return 'Не удалось отправить пробное уведомление'
-  return data?.sent ? 'Пробное уведомление отправлено' : 'Сообщение не доставлено, попробуйте выключить и включить заново'
+  if (error) return t('push.testFail')
+  return data?.sent ? t('push.testSent') : t('push.testNotDelivered')
 }

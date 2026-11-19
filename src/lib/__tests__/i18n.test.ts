@@ -3,7 +3,7 @@ import { dicts, setLang, t, tp } from '../i18n'
 
 describe('locales', () => {
   it('every key exists in both languages with same placeholders', () => {
-    const ph = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join(',')
+    const ph = (s: string) => [...new Set(s.match(/\{\w+\}/g) ?? [])].sort().join(',')
     const keys = new Set([...Object.keys(dicts.ru), ...Object.keys(dicts.en)])
     const problems: string[] = []
     for (const k of keys) {

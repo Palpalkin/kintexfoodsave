@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { t } from './i18n'
 
 export const cn = (...i: ClassValue[]) => twMerge(clsx(i))
 
@@ -14,7 +15,11 @@ export function daysLeft(expires: string | null): number | null {
 /** Шаг «использовал часть»: штуки по 1, вес/объём — крупными долями. */
 export function partStep(unit: string, qty: number): number {
   const u = unit.trim().toLowerCase().replace('.', '')
-  if (u === 'г' || u === 'мл') return qty >= 500 ? 100 : qty >= 100 ? 50 : 10
-  if (u === 'кг' || u === 'л') return qty > 1 ? 0.5 : 0.25
+  if (u === 'г' || u === 'g' || u === 'мл' || u === 'ml') return qty >= 500 ? 100 : qty >= 100 ? 50 : 10
+  if (u === 'кг' || u === 'kg' || u === 'л' || u === 'l') return qty > 1 ? 0.5 : 0.25
   return 1
 }
+
+/** Единица «штука» по умолчанию на текущем языке (данные в БД хранятся как ввёл пользователь). */
+export const defaultUnit = () => t('utils.pcs')
+export const isPcs = (unit: string) => ['шт', 'pcs'].includes(unit.trim().toLowerCase().replace('.', ''))

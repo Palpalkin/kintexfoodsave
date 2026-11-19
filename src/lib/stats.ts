@@ -1,3 +1,4 @@
+import { locale } from './i18n'
 // Сводка по ушедшим продуктам: по месяцам, самые частые выбросы, серия дней без выброса.
 export type Gone = { name: string; status: 'consumed' | 'discarded'; price: number | null; updated_at: string }
 export type Month = { key: string; label: string; eaten: number; thrown: number; lost: number }
@@ -8,7 +9,7 @@ export function summarize(rows: Gone[], now = new Date(), months = 6) {
   const list: Month[] = []
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    list.push({ key: mkey(d), label: d.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', ''), eaten: 0, thrown: 0, lost: 0 })
+    list.push({ key: mkey(d), label: d.toLocaleDateString(locale(), { month: 'short' }).replace('.', ''), eaten: 0, thrown: 0, lost: 0 })
   }
   const byKey = new Map(list.map((m) => [m.key, m]))
   const wasted = new Map<string, number>()

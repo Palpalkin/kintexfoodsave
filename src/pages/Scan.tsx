@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Camera, Plus, ScanLine, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
-import { enqueue, isOffline } from '@/lib/outbox'
+import { enqueue, friendlyError, isOffline } from '@/lib/outbox'
+import { locale, t as tr, useT } from '@/lib/i18n'
+import { defaultUnit } from '@/lib/utils'
 import { recognizeReceipt } from '@/lib/ocr'
 import { parseReceipt } from '@/lib/receipt'
 import { ExpiryField } from '@/components/ExpiryField'
@@ -13,10 +15,13 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 
+const money = (n: number) => n.toFixed(2).replace('.', locale() === 'ru-RU' ? ',' : '.') + ' ' + tr('stats.currency')
+
 type Row = { id: string; on: boolean; name: string; quantity: number; unit: string; exp: ExpiryState; sum: number | null }
 
 export default function Scan() {
   const { space, session } = useApp()
+  const t = useT()
   const nav = useNavigate()
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState({ p: 0, label: '' })
@@ -32,21 +37,21 @@ export default function Scan() {
     setBusy(true); setErr(null); setRows(null); setQr(null); setNote(null)
     try {
       // 1) QR чека: точная дата покупки и сумма (быстро, на устройстве)
-      setProgress({ p: 0.03, label: 'Ищу QR-код…' })
+      setProgress({ p: 0.03, label: t('scan.findingQr') })
       const code = await readReceiptQr(file).catch(() => null)
       if (code) setQr(code)
 
       // 2) Позиции по QR через сервис (работает только если подключён токен), иначе OCR по фото
       let items: { name: string; quantity: number; unit: string; expires_on: string | null; sum: number | null }[] = []
       if (code && !isOffline()) {
-        setProgress({ p: 0.08, label: 'Запрашиваю состав чека…' })
+        setProgress({ p: 0.08, label: t('scan.lookup') })
         const { data, error } = await supabase.functions.invoke('receipt-lookup', { body: { qr: code.raw } })
         if (!error && data?.items?.length) {
           items = data.items.map((i: { name: string; quantity: number; sum: number }) => ({
-            name: i.name, quantity: i.quantity, unit: Number.isInteger(i.quantity) ? 'шт' : 'кг',
+            name: i.name, quantity: i.quantity, unit: Number.isInteger(i.quantity) ? defaultUnit() : t('scan.kg'),
             expires_on: null, sum: i.sum,
           }))
-          setNote('Состав чека получен по QR-коду.')
+          setNote(t('scan.noteQr'))
         }
       }
       if (!items.length) {
@@ -56,10 +61,10 @@ export default function Scan() {
       }
       setRows(items.map((i) => ({ id: crypto.randomUUID(), on: true, name: i.name, quantity: i.quantity, unit: i.unit, exp: emptyExpiry(), sum: i.sum })))
       if (!items.length) setErr(code
-        ? 'QR прочитан (дата и сумма), но товары найти не удалось: сфотографируйте чек целиком, ровно и при хорошем свете, либо добавьте продукты вручную.'
-        : 'Не удалось найти позиции. Попробуйте сфотографировать чек ровнее и при хорошем свете, или добавьте продукты вручную.')
+        ? t('scan.noItemsQr')
+        : t('scan.noItems'))
     } catch (e) {
-      setErr('Ошибка распознавания: ' + (e instanceof Error ? e.message : String(e)))
+      setErr(t('scan.error', { msg: e instanceof Error ? e.message : String(e) }))
     } finally { setBusy(false) }
   }
 
@@ -82,26 +87,25 @@ export default function Scan() {
     setSaving(true)
     const payload = chosen.map((r) => ({
       id: r.id, space_id: space.id, created_by: session.user.id,
-      name: r.name.trim().slice(0, 120), quantity: r.quantity || 1, unit: r.unit || 'шт',
+      name: r.name.trim().slice(0, 120), quantity: r.quantity || 1, unit: r.unit || defaultUnit(),
       ...expiryFields(r.exp), location: null, price: r.sum,
     }))
     if (isOffline()) payload.forEach((row) => enqueue({ t: 'insert', table: 'products', row }))
     else {
       const { error } = await supabase.from('products').insert(payload)
-      if (error) { setErr(error.message); setSaving(false); return }
+      if (error) { setErr(friendlyError(error.message)); setSaving(false); return }
     }
     nav('/')
   }
 
   return (
     <div className="space-y-3">
-      <h2 className="flex items-center gap-2 text-lg font-semibold"><ScanLine size={20} />Скан чека</h2>
+      <h2 className="flex items-center gap-2 text-lg font-semibold"><ScanLine size={20} />{t('scan.title')}</h2>
 
       {!rows && (
         <Card className="space-y-3">
           <p className="text-sm text-green-900/80">
-            Сфотографируйте весь чек вместе с QR-кодом (Магнит, Дикси, Пятёрочка и др.): расправьте его и снимайте при хорошем свете. QR нужен для проверки суммы чека.
-            Распознавание идёт на вашем устройстве, фото никуда не отправляется.
+            {t('scan.intro')}
           </p>
           {busy ? (
             <div className="space-y-2">
@@ -110,8 +114,8 @@ export default function Scan() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              <Button asChild><label><Camera size={16} />Снять<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFile(e.target.files?.[0])} /></label></Button>
-              <Button asChild variant="outline"><label>Из галереи<input type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0])} /></label></Button>
+              <Button asChild><label><Camera size={16} />{t('scan.shoot')}<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFile(e.target.files?.[0])} /></label></Button>
+              <Button asChild variant="outline"><label>{t('scan.gallery')}<input type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0])} /></label></Button>
             </div>
           )}
         </Card>
@@ -119,11 +123,11 @@ export default function Scan() {
 
       {qr && (
         <Card className="border-green-200 bg-green-50 text-sm text-green-900">
-          QR-код прочитан{qr.date ? `: чек от ${qr.date.split('-').reverse().join('.')}` : ''}{qr.sum ? `, сумма ${qr.sum.toFixed(2).replace('.', ',')} ₽` : ''}.
+          {t('scan.qrRead')}{qr.date ? t('scan.qrDate', { date: qr.date.split('-').reverse().join(locale() === 'ru-RU' ? '.' : '/') }) : ''}{qr.sum ? t('scan.qrSum', { sum: money(qr.sum) }) : ''}.
           {note && <> {note}</>}
           {check && (check.ok
-            ? <> Сумма позиций сходится ✓</>
-            : <span className="text-orange-800"> Сумма распознанных позиций {check.total.toFixed(2).replace('.', ',')} ₽, не хватает {check.diff.toFixed(2).replace('.', ',')} ₽: возможно, часть товаров не распознана, проверьте список.</span>)}
+            ? <> {t('scan.sumOk')}</>
+            : <span className="text-orange-800"> {t('scan.sumBad', { total: money(check.total), diff: money(check.diff) })}</span>)}
         </Card>
       )}
 
@@ -131,7 +135,7 @@ export default function Scan() {
 
       {rows && (
         <>
-          <p className="text-sm text-green-900/70">Проверьте список: исправьте названия и количество, снимите галочки с лишнего. Для каждого продукта укажите дату производства и либо «годен N дней» (дату «годен до» посчитаю сама), либо «годен до даты».</p>
+          <p className="text-sm text-green-900/70">{t('scan.review')}</p>
           {rows.map((r) => (
             <Card key={r.id} className={`space-y-2 p-3 ${r.on ? '' : 'opacity-50'}`}>
               <div className="flex items-center gap-2">
@@ -140,18 +144,18 @@ export default function Scan() {
                 <Button variant="ghost" size="icon" onClick={() => setRows((x) => x && x.filter((y) => y.id !== r.id))}><Trash2 size={16} className="text-red-600" /></Button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><Label>Кол-во</Label><Input type="number" step="any" min="0" value={r.quantity} onChange={(e) => patch(r.id, { quantity: Number(e.target.value) })} /></div>
-                <div><Label>Ед.</Label><Input value={r.unit} onChange={(e) => patch(r.id, { unit: e.target.value })} /></div>
+                <div><Label>{t('scan.qty')}</Label><Input type="number" step="any" min="0" value={r.quantity} onChange={(e) => patch(r.id, { quantity: Number(e.target.value) })} /></div>
+                <div><Label>{t('scan.unit')}</Label><Input value={r.unit} onChange={(e) => patch(r.id, { unit: e.target.value })} /></div>
               </div>
               <ExpiryField value={r.exp} onChange={(exp) => patch(r.id, { exp })} />
             </Card>
           ))}
-          <Button variant="outline" className="w-full" onClick={() => setRows((x) => (x ?? []).concat({ id: crypto.randomUUID(), on: true, name: '', quantity: 1, unit: 'шт', exp: emptyExpiry(), sum: null }))}><Plus size={16} />Добавить строку</Button>
+          <Button variant="outline" className="w-full" onClick={() => setRows((x) => (x ?? []).concat({ id: crypto.randomUUID(), on: true, name: '', quantity: 1, unit: defaultUnit(), exp: emptyExpiry(), sum: null }))}><Plus size={16} />{t('scan.addRow')}</Button>
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => { setRows(null); setErr(null) }}>Заново</Button>
-            <Button onClick={save} disabled={saving}>Добавить ({rows.filter((r) => r.on && r.name.trim()).length})</Button>
+            <Button variant="outline" onClick={() => { setRows(null); setErr(null) }}>{t('scan.again')}</Button>
+            <Button onClick={save} disabled={saving}>{t('common.add')} ({rows.filter((r) => r.on && r.name.trim()).length})</Button>
           </div>
-          <details className="text-xs text-green-900/60"><summary>Распознанный текст</summary><pre className="mt-2 whitespace-pre-wrap">{raw}</pre></details>
+          <details className="text-xs text-green-900/60"><summary>{t('scan.rawText')}</summary><pre className="mt-2 whitespace-pre-wrap">{raw}</pre></details>
         </>
       )}
     </div>
