@@ -7,6 +7,7 @@ import { AppProvider, useApp } from '@/lib/session'
 import { flush, onOutboxChange, pendingCount } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
 import { currentSubscription } from '@/lib/push'
+import { updateBadge } from '@/lib/widget'
 import Auth, { NewPassword } from '@/pages/Auth'
 import Products from '@/pages/Products'
 import Recipes from '@/pages/Recipes'
@@ -55,6 +56,12 @@ function Shell() {
     void supabase.from('user_settings').select('lang').maybeSingle().then(({ data }) => { if (data?.lang === 'ru' || data?.lang === 'en') setLang(data.lang) })
   }, [session?.user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (space) void notifyExpiring(space.id) }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!space) return
+    const upd = () => { if (document.visibilityState === 'visible') void updateBadge(space.id) }
+    upd(); document.addEventListener('visibilitychange', upd)
+    return () => document.removeEventListener('visibilitychange', upd)
+  }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [pending, setPending] = useState(pendingCount())
   useEffect(() => { void flush() }, [session])
   useEffect(() => {

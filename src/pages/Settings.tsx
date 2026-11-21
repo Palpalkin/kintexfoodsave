@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { useT, locale } from '@/lib/i18n'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { InstallCard } from '@/components/InstallCard'
+import { WidgetCard } from '@/components/WidgetCard'
 import { LegalLinks } from '@/pages/Legal'
 import { exportData } from '@/lib/export'
 import { autoShopEnabled, setAutoShop } from '@/lib/shopping'
@@ -64,6 +65,7 @@ export default function Settings() {
       <h2 className="text-lg font-semibold">{tt('settings.title')}</h2>
       <Card className="flex items-center justify-between"><span className="font-medium">{tt('lang.label')} / Language</span><LanguageSwitch userId={session?.user.id} /></Card>
       <InstallCard />
+      <WidgetCard />
       {stat && (
         <Card className="space-y-1">
           <p className="text-xs font-medium text-green-900/60">{tt('settings.last30')}{space ? ` · ${space.name}` : ''}</p>

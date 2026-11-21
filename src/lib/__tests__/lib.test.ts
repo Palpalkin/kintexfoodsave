@@ -152,3 +152,34 @@ describe('english recipes', () => {
     expect(typicalDays('Whole milk')).toBe(5); expect(foodEmoji('Fresh salmon')).toBe('🐟')
   })
 })
+
+import { scriptableSource } from '../widget'
+describe('widget script', () => {
+  it('is valid JavaScript with embedded config', () => {
+    const src = scriptableSource('https://x.supabase.co', 'sb_publishable_k', 'a'.repeat(48))
+    expect(src).toContain('widget_summary'); expect(src).toContain('a'.repeat(48))
+    // Scriptable использует top-level await — оборачиваем в async-функцию для проверки синтаксиса
+    expect(() => new Function('return (async () => {' + src + '})')).not.toThrow()
+  })
+})
+
+describe('widget script runtime (Scriptable stubs)', () => {
+  it('renders medium, small and lock-screen families without throwing', async () => {
+    const data = { active: 12, expired: 1, soon3: 2, soon7: 4, shopping: 3, eaten30: 20, thrown30: 2, today: '2026-11-21', items: [{ name: 'Молоко', on: '2026-11-20' }, { name: 'Кефир', on: '2026-11-22' }] }
+    for (const fam of ['small', 'medium', 'large', 'accessoryCircular', 'accessoryRectangular']) {
+      const texts: string[] = []
+      const mkStack = (): Record<string, unknown> => ({ layoutHorizontally() {}, layoutVertically() {}, addSpacer() {}, addStack: mkStack, addText: (s: string) => { texts.push(s); return {} } })
+      class W { addStack = mkStack; addText = (s: string) => { texts.push(s); return {} }; addSpacer() {}; presentMedium() {} }
+      const store: Record<string, string> = {}
+      const env = {
+        Request: class { loadJSON() { return Promise.resolve(data) } }, FileManager: { local: () => ({ joinPath: (a: string, b: string) => a + b, documentsDirectory: () => '/', writeString: (p: string, s: string) => { store[p] = s }, fileExists: () => false, readString: () => '' }) },
+        ListWidget: W, LinearGradient: class {}, Color: class { static white() { return {} } }, Font: { boldSystemFont: () => ({}), systemFont: () => ({}) },
+        config: { widgetFamily: fam, runsInWidget: true }, Script: { setWidget() {}, complete() {} },
+      }
+      const src = scriptableSource('https://x', 'k', 'a'.repeat(48))
+      const AsyncFn = Object.getPrototypeOf(async function () {}).constructor
+      await new AsyncFn(...Object.keys(env), src)(...Object.values(env))
+      expect(texts.join('|')).toMatch(/12|3/)
+    }
+  })
+})
