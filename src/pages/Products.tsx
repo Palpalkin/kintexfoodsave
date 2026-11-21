@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Barcode, Camera, Check, Pencil, Plus, ScanLine, Search, Trash2, X } from 'lucide-react'
+import { Barcode, CalendarDays, Camera, Check, Pencil, Plus, ScanLine, Search, Trash2, X } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/session'
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card } from '@/components/ui/card'
 import { SwipeRow } from '@/components/SwipeRow'
+import { ListSkeleton } from '@/components/Splash'
 import { findPhoto } from '@/lib/photo'
 import { favKey, loadFavs, toggleFav } from '@/lib/favorites'
 import { Star } from 'lucide-react'
@@ -62,6 +63,7 @@ export default function Products() {
   const [badImg, setBadImg] = useState<Set<string>>(new Set())
   const [more, setMore] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [adding, setAdding] = useState(false)
   const [exp, setExp] = useState(emptyExpiry())
   const [nm, setNm] = useState('')
@@ -90,13 +92,13 @@ export default function Products() {
   const load = useCallback(async (from: number) => {
     if (!space) return
     const key = 'products.' + space.id
-    if (isOffline()) { if (from === 0) setItems(cacheGet<Product[]>(key) ?? []); return }
+    if (isOffline()) { if (from === 0) setItems(cacheGet<Product[]>(key) ?? []); setLoadedOnce(true); return }
     setLoading(true)
     const { data } = await supabase.from('products').select(COLS)
       .eq('space_id', space.id).eq('status', 'active')
       .order('expires_on', { ascending: true, nullsFirst: false })
       .range(from, from + PAGE - 1)
-    setLoading(false)
+    setLoading(false); setLoadedOnce(true)
     if (!data) return
     const next = from === 0 ? (data as Product[]) : (items.concat(data as Product[]))
     setItems(next); setMore(data.length === PAGE)
@@ -314,9 +316,10 @@ export default function Products() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5"><img src="/icon-192.png" alt="" className="fs-float h-9 w-9 rounded-xl shadow-sm" /><h2 className="text-xl font-bold tracking-tight">{t('products.title')}</h2></div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" asChild><Link to="/scan"><ScanLine size={16} />{t('products.receipt')}</Link></Button>
+        <div className="flex min-w-0 items-center gap-2"><img src="/icon-192.png" alt="" className="fs-float h-8 w-8 shrink-0 rounded-xl shadow-sm" /><h2 className="truncate text-lg font-bold tracking-tight">{t('products.title')}</h2></div>
+        <div className="flex shrink-0 gap-1.5">
+          <Button size="sm" variant="outline" asChild><Link to="/calendar" aria-label={t('products.calendar')}><CalendarDays size={16} /></Link></Button>
+          <Button size="sm" variant="outline" asChild><Link to="/scan" aria-label={t('products.receipt')} title={t('products.receipt')}><ScanLine size={16} /></Link></Button>
           <Button size="sm" onClick={() => setAdding(!adding)}>{adding ? <X size={16} /> : <Plus size={16} />}{adding ? t('common.cancel') : t('common.add')}</Button>
         </div>
       </div>
@@ -399,7 +402,8 @@ export default function Products() {
         </>
       )}
 
-      {!items.length && !loading && (
+      {!items.length && !loadedOnce && <ListSkeleton />}
+      {!items.length && loadedOnce && !loading && (
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <img src="/logo-pair.webp" alt="" className="h-36 w-auto" />
           <p className="text-sm text-green-900/60">{t('products.empty')}</p>

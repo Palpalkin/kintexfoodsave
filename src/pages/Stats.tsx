@@ -6,7 +6,9 @@ import { useApp } from '@/lib/session'
 import { cacheGet, cacheSet } from '@/lib/cache'
 import { locale, tp, useT } from '@/lib/i18n'
 import { summarize, type Gone } from '@/lib/stats'
+import { achievements, level } from '@/lib/achievements'
 import { Card } from '@/components/ui/card'
+import { ListSkeleton } from '@/components/Splash'
 
 export default function Stats() {
   const t = useT()
@@ -24,6 +26,8 @@ export default function Stats() {
   }, [space?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const s = useMemo(() => summarize(rows ?? []), [rows])
+  const ach = useMemo(() => achievements(rows ?? [], s.streak), [rows, s.streak])
+  const lv = level(ach.eaten)
   const max = Math.max(1, ...s.months.map((m) => m.eaten + m.thrown))
   const total = s.months.reduce((a, m) => ({ e: a.e + m.eaten, t: a.t + m.thrown, l: a.l + m.lost }), { e: 0, t: 0, l: 0 })
 
@@ -33,7 +37,7 @@ export default function Stats() {
         <Link to="/settings" aria-label={t('common.back')} className="rounded-full p-1 hover:bg-green-100"><ChevronLeft size={22} /></Link>
         <h2 className="text-lg font-semibold">{t('stats.title')}</h2>
       </div>
-      {rows === null ? <p className="py-10 text-center text-sm text-green-900/60">{t('common.loading')}</p> : (
+      {rows === null ? <ListSkeleton rows={3} /> : (
         <>
           {s.streak !== null || total.e > 0 ? (
             <Card className="fs-rise flex items-center gap-3">
@@ -44,6 +48,28 @@ export default function Stats() {
               </div>
             </Card>
           ) : null}
+
+          <Card className="fs-rise space-y-2">
+            <div className="flex items-baseline justify-between"><span className="text-lg font-bold">{t('level.title', { lv: lv.lv })}</span><span className="text-xs text-green-900/60">{ach.eaten} {t('level.used')}</span></div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-green-100"><div className="h-full rounded-full bg-brand-solid transition-all duration-700" style={{ width: lv.pct + '%' }} /></div>
+            <p className="text-xs text-green-900/60">{lv.next === null ? t('level.max') : t('level.next', { n: lv.next - ach.eaten })}</p>
+          </Card>
+          <Card className="fs-rise space-y-2">
+            <p className="text-xs font-medium text-green-900/60">{t('week.title')}</p>
+            <p className="text-sm">{ach.week.have >= ach.week.goal ? t('week.done') : t('week.text', { goal: ach.week.goal })}</p>
+            <div className="flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-orange-100"><div className="h-full rounded-full bg-orange-500 transition-all duration-700" style={{ width: Math.min(100, (ach.week.have / ach.week.goal) * 100) + '%' }} /></div><span className="text-xs font-medium">{Math.min(ach.week.have, ach.week.goal)}/{ach.week.goal}</span></div>
+          </Card>
+          <Card className="fs-rise space-y-2">
+            <p className="text-xs font-medium text-green-900/60">{t('badges.title')}</p>
+            <div className="grid grid-cols-4 gap-2">
+              {ach.badges.map((b) => (
+                <div key={b.id} title={t('badge.' + b.id)} className={`flex flex-col items-center gap-1 rounded-xl border p-2 text-center ${b.done ? 'border-brand bg-brand-soft' : 'border-green-100 opacity-50 grayscale'}`}>
+                  <span className="text-2xl">{b.icon}</span><span className="text-[10px] leading-tight">{t('badge.' + b.id)}</span>
+                  {!b.done && <span className="text-[10px] text-green-900/60">{b.have}/{b.goal}</span>}
+                </div>
+              ))}
+            </div>
+          </Card>
 
           <Card className="fs-rise space-y-3">
             <p className="text-xs font-medium text-green-900/60">{t('stats.last6')}</p>

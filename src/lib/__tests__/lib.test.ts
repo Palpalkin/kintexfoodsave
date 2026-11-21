@@ -183,3 +183,15 @@ describe('widget script runtime (Scriptable stubs)', () => {
     }
   })
 })
+
+import { achievements, level } from '../achievements'
+describe('achievements', () => {
+  it('levels grow with eaten count', () => { expect(level(0).lv).toBe(1); expect(level(5).lv).toBe(2); expect(level(600).pct).toBe(100) })
+  it('unlocks badges and weekly challenge', () => {
+    const now = new Date('2026-11-21T12:00:00')
+    const rows = Array.from({ length: 12 }, (_, i) => ({ name: 'x' + i, status: 'consumed' as const, price: null, updated_at: new Date(now.getTime() - i * 864e5).toISOString() }))
+    const a = achievements(rows, null, now)
+    expect(a.eaten).toBe(12); expect(a.badges.find((b) => b.id === 'ten')?.done).toBe(true); expect(a.badges.find((b) => b.id === 'fifty')?.done).toBe(false)
+    expect(a.week.have).toBeGreaterThanOrEqual(5)
+  })
+})

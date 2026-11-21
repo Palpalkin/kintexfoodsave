@@ -58,3 +58,20 @@ input, select, textarea { color: inherit; }
 button, a { transition: transform .12s ease, background-color .15s ease, box-shadow .15s ease; }
 @media (hover: hover) { button:hover:not(:disabled) { transform: translateY(-1px); } }
 @media (prefers-reduced-motion: reduce) { .fs-rise, .fs-toast, .fs-pulse, .fs-float, .fs-pop { animation: none; } }
+
+/* Экран загрузки и скелетоны */
+.fs-splash { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #f0fdf4; color: #14532d; }
+.fs-splash-logo { position: relative; width: 120px; height: 120px; display: grid; place-items: center; }
+.fs-splash-logo img { border-radius: 24px; box-shadow: 0 8px 24px rgba(21, 128, 61, .25); animation: fs-breathe 1.8s ease-in-out infinite; }
+.fs-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid rgba(21, 128, 61, .18); border-top-color: #15803d; animation: fs-spin 1s linear infinite; }
+.fs-splash-name { font-weight: 700; letter-spacing: .14em; font-size: 13px; opacity: .8; }
+.fs-bar { width: 140px; height: 4px; border-radius: 4px; background: rgba(21, 128, 61, .15); overflow: hidden; }
+.fs-bar i { display: block; height: 100%; width: 40%; border-radius: 4px; background: #15803d; animation: fs-slide 1.2s ease-in-out infinite; }
+@keyframes fs-spin { to { transform: rotate(360deg); } }
+@keyframes fs-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes fs-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+@keyframes fs-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.fs-skel { background: linear-gradient(90deg, rgba(21, 128, 61, .08) 25%, rgba(21, 128, 61, .18) 50%, rgba(21, 128, 61, .08) 75%); background-size: 200% 100%; animation: fs-shimmer 1.4s linear infinite; }
+.fs-skel-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; border: 1px solid rgba(21, 128, 61, .15); background: rgba(255, 255, 255, .5); animation: fs-fade .3s ease-out both; }
+@media (prefers-color-scheme: dark) { .fs-splash { background: #0b1a12; color: #bbf7d0; } .fs-bar i, .fs-ring { border-top-color: #4ade80; } .fs-bar i { background: #4ade80; } .fs-skel-row { background: rgba(255, 255, 255, .04); border-color: rgba(74, 222, 128, .15); } }
+@media (prefers-reduced-motion: reduce) { .fs-splash-logo img, .fs-ring, .fs-bar i, .fs-skel { animation: none; } }

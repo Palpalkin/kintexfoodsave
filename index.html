@@ -12,9 +12,18 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>KINTEXFOODSAVE</title>
+    <style>
+      body{margin:0}.fs-splash{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#f0fdf4;color:#14532d;font-family:system-ui,sans-serif}
+      .fs-splash-logo{position:relative;width:120px;height:120px;display:grid;place-items:center}.fs-splash-logo img{border-radius:24px;box-shadow:0 8px 24px rgba(21,128,61,.25)}
+      .fs-ring{position:absolute;inset:0;border-radius:50%;border:3px solid rgba(21,128,61,.18);border-top-color:#15803d;animation:s 1s linear infinite}
+      .fs-splash-name{font-weight:700;letter-spacing:.14em;font-size:13px;opacity:.8}.fs-bar{width:140px;height:4px;border-radius:4px;background:rgba(21,128,61,.15);overflow:hidden}
+      .fs-bar i{display:block;height:100%;width:40%;border-radius:4px;background:#15803d;animation:b 1.2s ease-in-out infinite}
+      @keyframes s{to{transform:rotate(360deg)}}@keyframes b{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+      @media(prefers-color-scheme:dark){.fs-splash{background:#0b1a12;color:#bbf7d0}.fs-ring{border-top-color:#4ade80}.fs-bar i{background:#4ade80}}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="fs-splash"><div class="fs-splash-logo"><span class="fs-ring"></span><img src="/icon-192.png" alt="" width="96" height="96"></div><div class="fs-splash-name">KINTEX FOODSAVE</div><div class="fs-bar"><i></i></div></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

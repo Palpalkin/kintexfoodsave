@@ -8,6 +8,7 @@ import { flush, onOutboxChange, pendingCount } from '@/lib/outbox'
 import { daysLeft, cn } from '@/lib/utils'
 import { currentSubscription } from '@/lib/push'
 import { updateBadge } from '@/lib/widget'
+import { Splash } from '@/components/Splash'
 import Auth, { NewPassword } from '@/pages/Auth'
 import Products from '@/pages/Products'
 import Recipes from '@/pages/Recipes'
@@ -16,6 +17,7 @@ import Family from '@/pages/Family'
 import Settings from '@/pages/Settings'
 import Scan from '@/pages/Scan'
 import Stats from '@/pages/Stats'
+import CalendarPage from '@/pages/Calendar'
 import { LegalPage, LEGAL_PATHS } from '@/pages/Legal'
 import { CookieNotice } from '@/components/CookieNotice'
 import { Onboarding, onboardingSeen } from '@/components/Onboarding'
@@ -74,7 +76,7 @@ function Shell() {
 
   if (LEGAL_PATHS.includes(loc.pathname)) return <><LegalPage path={loc.pathname} /><CookieNotice /></>
   if (!configured) return <div className="p-6 text-sm">{t('app.envMissing', { a: 'VITE_SUPABASE_URL', b: 'VITE_SUPABASE_PUBLISHABLE_KEY' })}</div>
-  if (!ready) return null
+  if (!ready) return <Splash />
   if (!session) return <><Auth /><CookieNotice /></>
   if (recovery) return <NewPassword onDone={clearRecovery} />
 
@@ -96,6 +98,7 @@ function Shell() {
           <Route path="/family" element={<Family />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/stats" element={<Stats />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
